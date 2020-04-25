@@ -1,4 +1,4 @@
-module PartialSolution exposing (PartialSolution, findPreviousSatisfier, findSatisfier, isSolution, toDict)
+module PartialSolution exposing (PartialSolution, dropUntilLevel, findPreviousSatisfier, findSatisfier, isSolution, toDict)
 
 import Assignment exposing (Assignment)
 import Dict exposing (Dict)
@@ -29,6 +29,20 @@ addTerm term maybeTerms =
 
         Just otherTerms ->
             Just (term :: otherTerms)
+
+
+dropUntilLevel : Int -> PartialSolution -> PartialSolution
+dropUntilLevel level partial =
+    case partial of
+        [] ->
+            []
+
+        assignment :: others ->
+            if assignment.decisionLevel > level then
+                dropUntilLevel level others
+
+            else
+                partial
 
 
 findSatisfier : Incompatibility -> PartialSolution -> ( Assignment, PartialSolution, Term )

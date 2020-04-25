@@ -1,4 +1,4 @@
-module Range exposing (Range(..), acceptVersion, equals, intersection, negate)
+module Range exposing (Range(..), acceptVersion, equals, intersection, negate, union)
 
 import Version exposing (Version)
 
@@ -54,6 +54,11 @@ normalizedBetween v1 v2 =
 
     else
         None
+
+
+union : Range -> Range -> Range
+union r1 r2 =
+    negate (intersection (negate r1) (negate r2))
 
 
 intersection : Range -> Range -> Range

@@ -1,4 +1,4 @@
-module Term exposing (Relation(..), Term(..), acceptVersion, contradicts, intersection, negate, relation, satisfies)
+module Term exposing (Relation(..), Term(..), acceptVersion, contradicts, intersection, negate, relation, satisfies, union)
 
 import Range exposing (Range)
 import Version exposing (Version)
@@ -89,8 +89,23 @@ intersection t1 t2 =
             Positive (Range.intersection (Range.negate r1) r2)
 
         ( Negative r1, Negative r2 ) ->
-            Negative <|
-                Range.negate (Range.intersection (Range.negate r1) (Range.negate r2))
+            Negative (Range.union r1 r2)
+
+
+union : Term -> Term -> Term
+union t1 t2 =
+    case ( t1, t2 ) of
+        ( Positive r1, Positive r2 ) ->
+            Positive (Range.union r1 r2)
+
+        ( Positive r1, Negative r2 ) ->
+            Positive (Range.union r1 (Range.negate r2))
+
+        ( Negative r1, Positive r2 ) ->
+            Positive (Range.union (Range.negate r1) r2)
+
+        ( Negative r1, Negative r2 ) ->
+            Negative (Range.intersection r1 r2)
 
 
 acceptVersion : Maybe Version -> Term -> Bool

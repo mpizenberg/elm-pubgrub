@@ -101,8 +101,8 @@ checkIncompatibilities root package othersChanged incompatibities partial =
                 checkIncompatibilities root package othersChanged othersIncompat partial
 
 
-conflictResolution : String -> Incompatibility -> PartialSolution -> Result String ( PartialSolution, Incompatibility )
-conflictResolution root incompat partial =
+conflictResolution : Bool -> String -> Incompatibility -> List Incompatibility -> PartialSolution -> Result String ( PartialSolution, Incompatibility, List Incompatibility )
+conflictResolution incompatChanged root incompat allIncompats partial =
     if Dict.isEmpty incompat then
         Err reportError
 
@@ -114,13 +114,13 @@ conflictResolution root incompat partial =
 
                 else
                     -- TODO: tail rec
-                    continueResolution incompat partial
+                    continueResolution incompatChanged incompat allIncompats partial
 
             _ ->
                 Err "Not possible"
 
     else
-        continueResolution incompat partial
+        continueResolution incompatChanged incompat allIncompats partial
 
 
 reportError : String
@@ -128,8 +128,8 @@ reportError =
     "The root package can't be selected, version solving has failed"
 
 
-continueResolution : Incompatibility -> PartialSolution -> Result String ( PartialSolution, Incompatibility )
-continueResolution incompat partial =
+continueResolution : Bool -> Incompatibility -> List Incompatibility -> PartialSolution -> Result String ( PartialSolution, Incompatibility, List Incompatibility )
+continueResolution incompatChanged incompat allIncompats partial =
     let
         ( satisfier, earlierPartial, term ) =
             PartialSolution.findSatisfier incompat partial
@@ -141,23 +141,34 @@ continueResolution incompat partial =
             Maybe.map (\( a, _, _ ) -> a.decisionLevel) maybePreviousSatisfier
                 |> Maybe.withDefault 1
     in
-    if Debug.todo "satisfier is a decision or previousSatisfierLevel /= satisfier level" then
-        let
-            () =
-                Debug.todo "if incompat /= original input, add to solver icompats set"
+    case satisfier.kind of
+        -- if satisfier.kind == Assignment.Decision || previousSatisfierLevel /= satisfier.decisionLevel then
+        Assignment.Decision ->
+            Ok (updateAllIncompatsHelper incompatChanged previousSatisfierLevel incompat allIncompats partial)
 
-            () =
-                Debug.todo "remove from partial all assignments with decision level > previousSatisfierLevel"
-        in
-        Debug.todo "return incompatibility"
+        Assignment.Derivation { cause } ->
+            if previousSatisfierLevel /= satisfier.decisionLevel then
+                Ok (updateAllIncompatsHelper incompatChanged previousSatisfierLevel incompat allIncompats partial)
 
-    else
-        let
-            priorCause =
-                Debug.todo "union of incompat and satisfier's cause minus terms referring to satisfier's package"
-        in
-        if Debug.todo "satisfier does not satisfy term" then
-            Debug.todo "add `not (satisfier - term)` to priorCause. Then set incompat to priorCause"
+            else
+                let
+                    priorCause =
+                        Incompatibility.priorCause satisfier.name cause incompat
+                in
+                if Debug.todo "satisfier does not satisfy term" then
+                    Debug.todo "add `not (satisfier - term)` to priorCause. Then set incompat to priorCause"
 
-        else
-            Debug.todo "set incompat to priorCause"
+                else
+                    Debug.todo "set incompat to priorCause"
+
+
+updateAllIncompatsHelper : Bool -> Int -> Incompatibility -> List Incompatibility -> PartialSolution -> ( PartialSolution, Incompatibility, List Incompatibility )
+updateAllIncompatsHelper incompatChanged previousSatisfierLevel incompat allIncompats partial =
+    ( PartialSolution.dropUntilLevel previousSatisfierLevel partial
+    , incompat
+    , if incompatChanged then
+        incompat :: allIncompats
+
+      else
+        allIncompats
+    )
