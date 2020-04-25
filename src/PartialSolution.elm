@@ -1,19 +1,14 @@
-module PartialSolution exposing (Assignment(..), PartialSolution, isSolution, toDict)
+module PartialSolution exposing (PartialSolution, findPreviousSatisfier, findSatisfier, isSolution, toDict)
 
+import Assignment exposing (Assignment)
 import Dict exposing (Dict)
 import Incompatibility exposing (Incompatibility)
 import Term exposing (Term)
+import Utils exposing (SearchDecision(..))
 
 
 type alias PartialSolution =
     List Assignment
-
-
-type Assignment {- Decision: individual package ids -}
-    = Decision { decisionLevel : Int, name : String, term : Term }
-      -- Derivation: "ranges" terms that must be true
-      -- given previous assignments and all incompatibilities
-    | Derivation { decisionLevel : Int, cause : Incompatibility, name : String, term : Term }
 
 
 toDict : PartialSolution -> Dict String (List Term)
@@ -23,11 +18,7 @@ toDict partial =
 
 addAssignment : Assignment -> Dict String (List Term) -> Dict String (List Term)
 addAssignment assignment allTerms =
-    let
-        ( name, term ) =
-            nameAndTerm assignment
-    in
-    Dict.update name (addTerm term) allTerms
+    Dict.update assignment.name (addTerm assignment.term) allTerms
 
 
 addTerm : Term -> Maybe (List Term) -> Maybe (List Term)
@@ -40,14 +31,58 @@ addTerm term maybeTerms =
             Just (term :: otherTerms)
 
 
-nameAndTerm : Assignment -> ( String, Term )
-nameAndTerm assignment =
-    case assignment of
-        Decision { name, term } ->
-            ( name, term )
+findSatisfier : Incompatibility -> PartialSolution -> ( Assignment, PartialSolution, Term )
+findSatisfier incompat partial =
+    Utils.find (searchSatisfier incompat) partial
+        |> Maybe.withDefault (Debug.todo "should always find something")
 
-        Derivation { name, term } ->
-            ( name, term )
+
+findPreviousSatisfier : Assignment -> Incompatibility -> PartialSolution -> Maybe ( Assignment, PartialSolution, Term )
+findPreviousSatisfier satisfier incompat earlierPartial =
+    Utils.find (searchPreviousSatisfier satisfier incompat) earlierPartial
+
+
+{-| Earliest assignment in the partial solution before satisfier
+such that incompatibility is satisfied by the partial solution up to
+and including that assignment plus satisfier.
+-}
+searchPreviousSatisfier : Assignment -> Incompatibility -> { left : Int, right : Int } -> Assignment -> List Assignment -> SearchDecision ( Assignment, PartialSolution, Term )
+searchPreviousSatisfier satisfier incompat sides assignment earlierAssignments =
+    searchSatisfier incompat sides assignment (satisfier :: earlierAssignments)
+
+
+{-| A satisfier is the earliest assignment in partial solution such that the incompatibility
+is satisfied by the partial solution up to and including that assignment.
+Also returns all assignments earlier than the satisfier.
+We call the term in the incompatibility that refers to the same package "term".
+-}
+searchSatisfier : Incompatibility -> { left : Int, right : Int } -> Assignment -> List Assignment -> SearchDecision ( Assignment, PartialSolution, Term )
+searchSatisfier incompat { left, right } assignment earlierAssignments =
+    let
+        partial =
+            assignment :: earlierAssignments
+    in
+    case Incompatibility.relation incompat (toDict partial) of
+        -- if it satisfies, search right (earlier assignments)
+        Incompatibility.Satisfies ->
+            if right == 0 then
+                Found <|
+                    ( assignment
+                    , earlierAssignments
+                    , Dict.get assignment.name incompat
+                        |> Maybe.withDefault (Debug.todo "term should exist")
+                    )
+
+            else
+                KeepGoRight (max 1 (right // 2))
+
+        -- if it does not satisfy, search left (later assignments)
+        _ ->
+            if left == 0 then
+                Stop
+
+            else
+                GoLeft (max 1 (left // 2))
 
 
 {-| If a partial solution has, for every positive derivation,
@@ -60,17 +95,19 @@ isSolution partial =
         [] ->
             True
 
-        (Decision _) :: others ->
-            isSolution others
-
-        (Derivation { name, term }) :: others ->
-            case term of
-                Term.Negative _ ->
+        assignment :: others ->
+            case assignment.kind of
+                Assignment.Decision ->
                     isSolution others
 
-                Term.Positive _ ->
-                    -- BEWARE, not tail recursive
-                    Term.satisfies term (decision name others) && isSolution others
+                Assignment.Derivation _ ->
+                    case assignment.term of
+                        Term.Negative _ ->
+                            isSolution others
+
+                        Term.Positive _ ->
+                            -- BEWARE, not tail recursive
+                            Term.satisfies assignment.term (decision assignment.name others) && isSolution others
 
 
 decision : String -> PartialSolution -> List Term
@@ -79,12 +116,14 @@ decision searchedName partial =
         [] ->
             []
 
-        (Decision { name, term }) :: others ->
-            if name == searchedName then
-                [ term ]
+        assignment :: others ->
+            case assignment.kind of
+                Assignment.Decision ->
+                    if assignment.name == searchedName then
+                        [ assignment.term ]
 
-            else
-                decision searchedName others
+                    else
+                        decision searchedName others
 
-        _ :: others ->
-            decision searchedName others
+                _ ->
+                    decision searchedName others
