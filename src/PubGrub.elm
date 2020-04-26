@@ -114,13 +114,13 @@ conflictResolution incompatChanged root incompat allIncompats partial =
 
                 else
                     -- TODO: tail rec
-                    continueResolution incompatChanged incompat allIncompats partial
+                    continueResolution incompatChanged root incompat allIncompats partial
 
             _ ->
                 Err "Not possible"
 
     else
-        continueResolution incompatChanged incompat allIncompats partial
+        continueResolution incompatChanged root incompat allIncompats partial
 
 
 reportError : String
@@ -128,8 +128,8 @@ reportError =
     "The root package can't be selected, version solving has failed"
 
 
-continueResolution : Bool -> Incompatibility -> List Incompatibility -> PartialSolution -> Result String ( PartialSolution, Incompatibility, List Incompatibility )
-continueResolution incompatChanged incompat allIncompats partial =
+continueResolution : Bool -> String -> Incompatibility -> List Incompatibility -> PartialSolution -> Result String ( PartialSolution, Incompatibility, List Incompatibility )
+continueResolution incompatChanged root incompat allIncompats partial =
     let
         ( satisfier, earlierPartial, term ) =
             PartialSolution.findSatisfier incompat partial
@@ -155,11 +155,23 @@ continueResolution incompatChanged incompat allIncompats partial =
                     priorCause =
                         Incompatibility.priorCause satisfier.name cause incompat
                 in
-                if Debug.todo "satisfier does not satisfy term" then
-                    Debug.todo "add `not (satisfier - term)` to priorCause. Then set incompat to priorCause"
+                -- if satisfier does not satisfy term
+                if not (Term.satisfies term [ satisfier.term ]) then
+                    -- add `not (satisfier - term)` to priorCause. Then set incompat to priorCause
+                    let
+                        derived =
+                            Term.union term (Term.negate satisfier.term)
+
+                        newIncompat =
+                            Incompatibility.termUnion satisfier.name derived priorCause
+                    in
+                    -- set incompat to newIncompat
+                    -- TODO: tail rec
+                    conflictResolution True root newIncompat allIncompats partial
 
                 else
-                    Debug.todo "set incompat to priorCause"
+                    -- set incompat to priorCause
+                    conflictResolution True root priorCause allIncompats partial
 
 
 updateAllIncompatsHelper : Bool -> Int -> Incompatibility -> List Incompatibility -> PartialSolution -> ( PartialSolution, Incompatibility, List Incompatibility )

@@ -1,4 +1,4 @@
-module Incompatibility exposing (Incompatibility, Relation(..), priorCause, relation)
+module Incompatibility exposing (Incompatibility, Relation(..), priorCause, relation, termUnion)
 
 import Dict exposing (Dict)
 import Term exposing (Term)
