@@ -39,68 +39,62 @@ init root version =
     Dict.singleton root (Term.Negative (Range.Exact version))
 
 
-unitPropagation : String -> String -> List Incompatibility -> PartialSolution -> ()
-unitPropagation root name incompatibities partial =
-    unitPropagationLoop root (Set.singleton name) incompatibities partial
+unitPropagation : String -> String -> List Incompatibility -> PartialSolution -> Result String ( PartialSolution, List Incompatibility )
+unitPropagation root package incompatibilities partial =
+    unitPropagationLoop root "" [ package ] [] incompatibilities partial
 
 
-unitPropagationLoop : String -> Set String -> List Incompatibility -> PartialSolution -> ()
-unitPropagationLoop root changed incompatibities partial =
-    case Set.toList changed of
+unitPropagationLoop : String -> String -> List String -> List Incompatibility -> List Incompatibility -> PartialSolution -> Result String ( PartialSolution, List Incompatibility )
+unitPropagationLoop root package changed loopIncompatibilities allIncompats partial =
+    case loopIncompatibilities of
         [] ->
-            Debug.todo "finish unitPropagationLoop"
+            case changed of
+                [] ->
+                    Ok ( partial, allIncompats )
 
-        package :: othersChanged ->
-            -- TODO: tail rec
-            checkIncompatibilities root package othersChanged incompatibities partial
-
-
-checkIncompatibilities : String -> String -> List String -> List Incompatibility -> PartialSolution -> ()
-checkIncompatibilities root package othersChanged incompatibities partial =
-    case incompatibities of
-        [] ->
-            Debug.todo "finish checkIncompatibilities"
+                pack :: othersChanged ->
+                    unitPropagationLoop root pack othersChanged allIncompats allIncompats partial
 
         incompat :: othersIncompat ->
             if Dict.member package incompat then
                 case Incompatibility.relation incompat (PartialSolution.toDict partial) of
                     Incompatibility.Satisfies ->
-                        let
-                            () =
-                                Debug.todo "conflic resolution with incompatibility"
+                        case conflictResolution False root incompat allIncompats partial of
+                            Err msg ->
+                                Err msg
 
-                            () =
-                                Debug.todo "add not term to partial with incompat as cause"
+                            Ok ( updatedPartial, priorCause, updatedAllIncompats ) ->
+                                -- priorCause is guaranted to be almost satisfied by the partial solution
+                                case Incompatibility.relation priorCause (PartialSolution.toDict updatedPartial) of
+                                    Incompatibility.AlmostSatisfies name term ->
+                                        let
+                                            -- add not term to partial with incompat as cause
+                                            partialWithNotTermInPriorCause =
+                                                PartialSolution.prependDerivation name term priorCause updatedPartial
+                                        in
+                                        -- Replace changed with a set containing only term's package name.
+                                        unitPropagationLoop root package [ name ] othersIncompat updatedAllIncompats partialWithNotTermInPriorCause
 
-                            () =
-                                Debug.todo "replace changed with Set.singleton term.name"
-                        in
-                        ()
+                                    _ ->
+                                        Err "This should never happen, priorCause is guaranted to be almost satisfied by the partial solution"
 
                     Incompatibility.AlmostSatisfies name term ->
                         let
-                            derivation =
-                                { name = name
-                                , term = term
-                                , decisionLevel = Debug.todo "decisionLevel"
-                                , kind = Assignment.Derivation { cause = incompat }
-                                }
-
                             updatedPartial =
-                                derivation :: partial
-
-                            newChanged =
-                                name :: othersChanged
+                                -- derivation :: partial
+                                PartialSolution.prependDerivation name term incompat partial
                         in
-                        checkIncompatibilities root package newChanged othersIncompat updatedPartial
+                        unitPropagationLoop root package (name :: changed) othersIncompat allIncompats updatedPartial
 
                     _ ->
-                        checkIncompatibilities root package othersChanged othersIncompat partial
+                        unitPropagationLoop root package changed othersIncompat allIncompats partial
 
             else
-                checkIncompatibilities root package othersChanged othersIncompat partial
+                unitPropagationLoop root package changed othersIncompat allIncompats partial
 
 
+{-| Returns ( updated partial solution, prior cause, updated list of incompatibilities )
+-}
 conflictResolution : Bool -> String -> Incompatibility -> List Incompatibility -> PartialSolution -> Result String ( PartialSolution, Incompatibility, List Incompatibility )
 conflictResolution incompatChanged root incompat allIncompats partial =
     if Dict.isEmpty incompat then
@@ -108,7 +102,7 @@ conflictResolution incompatChanged root incompat allIncompats partial =
 
     else if Dict.size incompat == 1 then
         case Dict.toList incompat of
-            ( name, Term.Positive term ) :: [] ->
+            ( name, Term.Positive _ ) :: [] ->
                 if name == root then
                     Err reportError
 
@@ -120,6 +114,7 @@ conflictResolution incompatChanged root incompat allIncompats partial =
                 Err "Not possible"
 
     else
+        -- TODO: tail rec
         continueResolution incompatChanged root incompat allIncompats partial
 
 
@@ -157,7 +152,7 @@ continueResolution incompatChanged root incompat allIncompats partial =
                 in
                 -- if satisfier does not satisfy term
                 if not (Term.satisfies term [ satisfier.term ]) then
-                    -- add `not (satisfier - term)` to priorCause. Then set incompat to priorCause
+                    -- add `not (satisfier \ term)` to priorCause. Then set incompat to priorCause
                     let
                         derived =
                             Term.union term (Term.negate satisfier.term)
@@ -171,6 +166,7 @@ continueResolution incompatChanged root incompat allIncompats partial =
 
                 else
                     -- set incompat to priorCause
+                    -- TODO: tail rec
                     conflictResolution True root priorCause allIncompats partial
 
 

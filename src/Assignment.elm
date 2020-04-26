@@ -1,4 +1,4 @@
-module Assignment exposing (Assignment, Kind(..))
+module Assignment exposing (Assignment, Kind(..), newDecision, newDerivation)
 
 import Incompatibility exposing (Incompatibility)
 import Term exposing (Term)
@@ -18,3 +18,20 @@ type Kind {- Decision: individual package ids -}
       -- given previous assignments and all incompatibilities
     | Derivation { cause : Incompatibility }
 
+
+newDecision : String -> Term -> Int -> Assignment
+newDecision name term decisionLevel =
+    { name = name
+    , term = term
+    , decisionLevel = decisionLevel
+    , kind = Decision
+    }
+
+
+newDerivation : String -> Term -> Int -> Incompatibility -> Assignment
+newDerivation name term decisionLevel cause =
+    { name = name
+    , term = term
+    , decisionLevel = decisionLevel
+    , kind = Derivation { cause = cause }
+    }

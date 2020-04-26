@@ -1,4 +1,4 @@
-module PartialSolution exposing (PartialSolution, dropUntilLevel, findPreviousSatisfier, findSatisfier, isSolution, toDict)
+module PartialSolution exposing (PartialSolution, dropUntilLevel, findPreviousSatisfier, findSatisfier, isSolution, prependDecision, prependDerivation, toDict)
 
 import Assignment exposing (Assignment)
 import Dict exposing (Dict)
@@ -9,6 +9,26 @@ import Utils exposing (SearchDecision(..))
 
 type alias PartialSolution =
     List Assignment
+
+
+prependDecision : String -> Term -> PartialSolution -> PartialSolution
+prependDecision name term partial =
+    case partial of
+        [] ->
+            [ Assignment.newDecision name term 0 ]
+
+        { decisionLevel } :: _ ->
+            Assignment.newDecision name term (decisionLevel + 1) :: partial
+
+
+prependDerivation : String -> Term -> Incompatibility -> PartialSolution -> PartialSolution
+prependDerivation name term cause partial =
+    case partial of
+        [] ->
+            [ Assignment.newDerivation name term 0 cause ]
+
+        { decisionLevel } :: _ ->
+            Assignment.newDerivation name term decisionLevel cause :: partial
 
 
 toDict : PartialSolution -> Dict String (List Term)
