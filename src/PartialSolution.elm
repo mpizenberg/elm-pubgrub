@@ -3,12 +3,40 @@ module PartialSolution exposing (PartialSolution, dropUntilLevel, findPreviousSa
 import Assignment exposing (Assignment)
 import Dict exposing (Dict)
 import Incompatibility exposing (Incompatibility)
+import Range
 import Term exposing (Term)
 import Utils exposing (SearchDecision(..))
+import Version exposing (Version)
 
 
 type alias PartialSolution =
     List Assignment
+
+
+{-| We can add the version to the partial solution as a decision
+if it doesn't produce any conflict with the new incompatibilities.
+In practice I think it can only produce a conflict if one of the dependencies
+(which are used to make the new incompatibilities)
+is already in the partial solution with an incompatible version.
+-}
+canAddVersion : String -> Version -> List Incompatibility -> PartialSolution -> Bool
+canAddVersion name version newIncompatibilities partial =
+    doesNotSatisfy newIncompatibilities (toDict (prependDecision name (Term.Positive (Range.Exact version)) partial))
+
+
+doesNotSatisfy : List Incompatibility -> Dict String (List Term) -> Bool
+doesNotSatisfy newIncompatibilities partial =
+    case newIncompatibilities of
+        [] ->
+            True
+
+        incompat :: others ->
+            case Incompatibility.relation incompat partial of
+                Incompatibility.Satisfies ->
+                    False
+
+                _ ->
+                    doesNotSatisfy others partial
 
 
 prependDecision : String -> Term -> PartialSolution -> PartialSolution
@@ -141,11 +169,11 @@ isSolution partial =
 
                         Term.Positive _ ->
                             -- BEWARE, not tail recursive
-                            Term.satisfies assignment.term (decision assignment.name others) && isSolution others
+                            Term.satisfies assignment.term (getDecision assignment.name others) && isSolution others
 
 
-decision : String -> PartialSolution -> List Term
-decision searchedName partial =
+getDecision : String -> PartialSolution -> List Term
+getDecision searchedName partial =
     case partial of
         [] ->
             []
@@ -157,7 +185,7 @@ decision searchedName partial =
                         [ assignment.term ]
 
                     else
-                        decision searchedName others
+                        getDecision searchedName others
 
                 _ ->
-                    decision searchedName others
+                    getDecision searchedName others

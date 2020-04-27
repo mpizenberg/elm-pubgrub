@@ -39,6 +39,27 @@ init root version =
     Dict.singleton root (Term.Negative (Range.Exact version))
 
 
+{-| Heuristic to pick the next package & version to add to the partial solution.
+This should be a package with a positive derivation but no decision yet.
+If multiple choices are possible, use a heuristic.
+
+Pub chooses the latest matching version of the package
+with the fewest versions that match the outstanding constraint.
+This tends to find conflicts earlier if any exist,
+since these packages will run out of versions to try more quickly.
+But there's likely room for improvement in these heuristics.
+
+Let "term" be the intersection of all assignment in the partial solution
+referring to that package.
+If no version matches that term return an error with
+the package name and the incompatibity {term}.
+
+-}
+pickPackage : PartialSolution -> Result ( String, Incompatibility ) ( String, Version )
+pickPackage partial =
+    Debug.todo "pickPackage"
+
+
 unitPropagation : String -> String -> List Incompatibility -> PartialSolution -> Result String ( PartialSolution, List Incompatibility )
 unitPropagation root package incompatibilities partial =
     unitPropagationLoop root "" [ package ] [] incompatibilities partial

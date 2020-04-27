@@ -1,7 +1,9 @@
 module Incompatibility exposing (Incompatibility, Relation(..), priorCause, relation, termUnion)
 
 import Dict exposing (Dict)
+import Range exposing (Range)
 import Term exposing (Term)
+import Version exposing (Version)
 
 
 type alias Incompatibility =
@@ -13,6 +15,20 @@ type Relation
     | AlmostSatisfies String Term
     | Contradicts String Term
     | Inconclusive
+
+
+{-| Generate a list of incompatibilities from direct dependencies of a package.
+-}
+fromDependencies : String -> Version -> List ( String, Range ) -> List Incompatibility
+fromDependencies package version dependencies =
+    let
+        baseIncompat =
+            Dict.singleton package (Term.Positive (Range.Exact version))
+
+        addIncompat ( name, range ) accumIncompats =
+            Dict.insert name (Term.Negative range) baseIncompat :: accumIncompats
+    in
+    List.foldl addIncompat [] dependencies
 
 
 {-| union of incompat and satisfier's cause minus terms referring to satisfier's package"
