@@ -1,16 +1,37 @@
-module PartialSolution exposing (PartialSolution, dropUntilLevel, findPreviousSatisfier, findSatisfier, isSolution, prependDecision, prependDerivation, toDict)
+module PartialSolution exposing (PartialSolution, dropUntilLevel, findPreviousSatisfier, findSatisfier, isSolution, prependDecision, prependDerivation, splitDecisions, toDict)
 
 import Assignment exposing (Assignment)
 import Dict exposing (Dict)
 import Incompatibility exposing (Incompatibility)
 import Range
+import Set exposing (Set)
 import Term exposing (Term)
 import Utils exposing (SearchDecision(..))
 import Version exposing (Version)
 
 
+{-| Both the "List Assignment" form and the "Dict String (List Term)" form
+are quite useful for some parts of the pubgrub algorithm.
+Maybe a custom opaque type with both forms would provide performance benefits.
+This could be fun to benchmark :)
+-}
 type alias PartialSolution =
     List Assignment
+
+
+splitDecisions : PartialSolution -> ( Set String, Dict String (List Term) ) -> ( Set String, Dict String (List Term) )
+splitDecisions partial ( decisions, derivations ) =
+    case partial of
+        [] ->
+            ( decisions, derivations )
+
+        assignment :: others ->
+            case assignment.kind of
+                Assignment.Decision ->
+                    splitDecisions others ( Set.insert assignment.name decisions, derivations )
+
+                Assignment.Derivation _ ->
+                    splitDecisions others ( decisions, Dict.update assignment.name (Just << (::) assignment.term << Maybe.withDefault []) derivations )
 
 
 {-| We can add the version to the partial solution as a decision

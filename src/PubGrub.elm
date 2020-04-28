@@ -1,10 +1,10 @@
 module PubGrub exposing (solve)
 
 import Assignment
-import Dict
+import Dict exposing (Dict)
 import Incompatibility exposing (Incompatibility)
 import PartialSolution exposing (PartialSolution)
-import Range
+import Range exposing (Range)
 import Set exposing (Set)
 import Term exposing (Term)
 import Version exposing (Version)
@@ -55,9 +55,51 @@ If no version matches that term return an error with
 the package name and the incompatibity {term}.
 
 -}
-pickPackage : PartialSolution -> Result ( String, Incompatibility ) ( String, Version )
+pickPackageVersion : PartialSolution -> (String -> List Version) -> Result () ()
+pickPackageVersion partial listAllVersions =
+    let
+        ( name, terms ) =
+            pickPackage partial
+
+        version =
+            pickVersion name listAllVersions terms
+
+        dependencies =
+            Maybe.andThen (getDependencies name) version
+
+        _ =
+            Debug.todo "Add incompatibilities obtained from dependencies in to the set of incompatibilities"
+    in
+    Debug.todo "TODO"
+
+
+pickPackage : PartialSolution -> ( String, List Term )
 pickPackage partial =
-    Debug.todo "pickPackage"
+    potentialPackages partial
+        |> Dict.toList
+        |> List.head
+        |> Maybe.withDefault (Debug.todo "Is it possible that there is no potential package?")
+
+
+potentialPackages : PartialSolution -> Dict String (List Term)
+potentialPackages partial =
+    let
+        -- ( Set String, Dict String (List Term) )
+        ( decisions, derivations ) =
+            PartialSolution.splitDecisions partial ( Set.empty, Dict.empty )
+    in
+    -- TODO: should also filter out packages with no positive derivation!
+    Dict.filter (\name _ -> not (Set.member name decisions)) derivations
+
+
+pickVersion : String -> (String -> List Version) -> List Term -> Maybe Version
+pickVersion name listAllVersions partialSolutionTerms =
+    Debug.todo "pickVersion"
+
+
+getDependencies : String -> Version -> Maybe (List ( String, Range ))
+getDependencies package version =
+    Debug.todo "Should be implemented lazily"
 
 
 unitPropagation : String -> String -> List Incompatibility -> PartialSolution -> Result String ( PartialSolution, List Incompatibility )
