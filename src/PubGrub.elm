@@ -55,25 +55,31 @@ If no version matches that term return an error with
 the package name and the incompatibity {term}.
 
 -}
-pickPackageVersion : PartialSolution -> (String -> List Version) -> Result () ()
+pickPackageVersion : PartialSolution -> (String -> List Version) -> Result ( String, Incompatibility ) ( String, Version )
 pickPackageVersion partial listAvailableVersions =
     let
-        ( name, terms ) =
+        ( name, term ) =
             pickPackage partial
-
-        availableVersions =
-            listAvailableVersions name
-
-        version =
-            pickVersion availableVersions terms
-
-        dependencies =
-            Maybe.andThen (getDependencies name) version
-
-        _ =
-            Debug.todo "Add incompatibilities obtained from dependencies in to the set of incompatibilities"
     in
-    Debug.todo "TODO"
+    pickVersion (listAvailableVersions name) term
+        |> Maybe.map (Tuple.pair name)
+        |> Result.fromMaybe ( name, Dict.singleton name term )
+
+
+
+-- TODO: function makeDecision
+-- let
+--     dependencies =
+--         getDependenciesStub1 name version
+--             |> Maybe.withDefault (Debug.todo "The name and version should exist")
+--
+--     depIncompats =
+--         Incompatibility.fromDependencies name version dependencies
+--
+--     updatedAllIncompats =
+--         List.foldr Incompatibility.merge allIncompats depIncompats
+-- in
+-- Debug.todo "TODO"
 
 
 {-| Heuristic to pick the next package to add to the partial solution.
@@ -89,12 +95,13 @@ But there's likely room for improvement in these heuristics.
 Here we just pick the first one.
 
 -}
-pickPackage : PartialSolution -> ( String, List Term )
+pickPackage : PartialSolution -> ( String, Term )
 pickPackage partial =
     potentialPackages partial
         |> Dict.toList
         |> List.head
         |> Maybe.withDefault (Debug.todo "Is it possible that there is no potential package?")
+        |> Tuple.mapSecond (Term.listIntersection Nothing)
 
 
 potentialPackages : PartialSolution -> Dict String (List Term)
@@ -115,23 +122,30 @@ Its the responsibility of the provider of `availableVersions`
 to list them with preferred versions first.
 
 -}
-pickVersion : List Version -> List Term -> Maybe Version
-pickVersion availableVersions partialSolutionTerms =
+pickVersion : List Version -> Term -> Maybe Version
+pickVersion availableVersions partialSolutionTerm =
     case availableVersions of
         [] ->
             Nothing
 
         v :: others ->
-            if Term.contradicts (Term.Positive (Range.Exact v)) partialSolutionTerms then
-                pickVersion others partialSolutionTerms
+            if Term.acceptVersionJust v partialSolutionTerm then
+                Just v
 
             else
-                Just v
+                pickVersion others partialSolutionTerm
 
 
 getDependencies : String -> Version -> Maybe (List ( String, Range ))
 getDependencies package version =
     Debug.todo "Should be implemented lazily"
+
+
+getDependenciesStub1 : String -> Version -> Maybe (List ( String, Range ))
+getDependenciesStub1 package version =
+    case ( package, version ) of
+        _ ->
+            Nothing
 
 
 unitPropagation : String -> String -> List Incompatibility -> PartialSolution -> Result String ( PartialSolution, List Incompatibility )

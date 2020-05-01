@@ -1,4 +1,4 @@
-module Incompatibility exposing (Incompatibility, Relation(..), priorCause, relation, termUnion)
+module Incompatibility exposing (Incompatibility, Relation(..), fromDependencies, merge, priorCause, relation, termUnion)
 
 import Dict exposing (Dict)
 import Range exposing (Range)
@@ -29,6 +29,27 @@ fromDependencies package version dependencies =
             Dict.insert name (Term.Negative range) baseIncompat :: accumIncompats
     in
     List.foldl addIncompat [] dependencies
+
+
+{-| Add incompatibilities obtained from dependencies in to the set of incompatibilities.
+
+Pubgrub collapses identical dependencies from adjacent package versions
+into individual incompatibilities.
+This substantially reduces the total number of incompatibilities
+and makes it much easier for Pubgrub to reason about multiple versions of packages at once.
+For example, rather than representing
+foo 1.0.0 depends on bar ^1.0.0 and
+foo 1.1.0 depends on bar ^1.0.0
+as two separate incompatibilities,
+they're collapsed together into the single incompatibility {foo ^1.0.0, not bar ^1.0.0}
+
+Here we do the simple stupid thing of just growing the list.
+TODO: improve this.
+
+-}
+merge : Incompatibility -> List Incompatibility -> List Incompatibility
+merge incompat allIncompats =
+    incompat :: allIncompats
 
 
 {-| union of incompat and satisfier's cause minus terms referring to satisfier's package"

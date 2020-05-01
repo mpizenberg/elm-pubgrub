@@ -1,4 +1,4 @@
-module Term exposing (Relation(..), Term(..), acceptVersion, contradicts, intersection, isPositive, negate, relation, satisfies, union)
+module Term exposing (Relation(..), Term(..), acceptVersion, acceptVersionJust, contradicts, intersection, isPositive, listIntersection, negate, relation, satisfies, union)
 
 import Range exposing (Range)
 import Version exposing (Version)
@@ -39,7 +39,7 @@ relation : Term -> List Term -> Relation
 relation term set =
     let
         setIntersection =
-            List.foldl intersection (Negative Range.None) set
+            listIntersection Nothing set
 
         fullIntersection =
             intersection term setIntersection
@@ -54,18 +54,25 @@ relation term set =
         Inconclusive
 
 
+{-| Wondering if it would be better to return a Maybe Term
+and let the caller decide what should be the default if Nothing.
+-}
+listIntersection : Maybe Term -> List Term -> Term
+listIntersection initial terms =
+    List.foldl intersection (Maybe.withDefault (Negative Range.None) initial) terms
+
+
 contradicts : Term -> List Term -> Bool
 contradicts term set =
     -- Not sure about the behavior for the empty list ...
-    List.foldl intersection term set
+    listIntersection (Just term) set
         |> equals (Positive Range.None)
 
 
 satisfies : Term -> List Term -> Bool
 satisfies term set =
     -- Not sure about the behavior for the empty list ...
-    List.foldl intersection (Negative Range.None) set
-        |> subsetOf term
+    subsetOf term (listIntersection Nothing set)
 
 
 subsetOf : Term -> Term -> Bool
