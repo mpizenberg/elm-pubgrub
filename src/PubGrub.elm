@@ -1,6 +1,7 @@
 module PubGrub exposing (solve)
 
 import Assignment
+import Database.Stub as Stub
 import Dict exposing (Dict)
 import Incompatibility exposing (Incompatibility)
 import PartialSolution exposing (PartialSolution)
@@ -10,9 +11,9 @@ import Term exposing (Term)
 import Version exposing (Version)
 
 
-solve : String -> Result String (List { name : String, version : Version })
-solve root =
-    solveRec root root [ init root Version.one ] []
+solve : String -> Version -> Result String (List { name : String, version : Version })
+solve root version =
+    solveRec root root [ init root version ] []
 
 
 solveRec : String -> String -> List Incompatibility -> PartialSolution -> Result String (List { name : String, version : Version })
@@ -24,7 +25,7 @@ solveRec root package allIncompats partial =
         Ok ( updatedPartial, updatedAllIncompats ) ->
             let
                 ( next, updatedAgainAllIncompats, updatedAgainPartial ) =
-                    makeDecision (Debug.todo "listAvailableVersions") updatedAllIncompats updatedPartial
+                    makeDecision Stub.listAvailableVersions updatedAllIncompats updatedPartial
             in
             if PartialSolution.isSolution updatedPartial then
                 Ok (List.filterMap Assignment.finalDecision updatedPartial)
@@ -47,7 +48,7 @@ makeDecision listAvailableVersions allIncompats partial =
         Ok ( name, version ) ->
             let
                 dependencies =
-                    getDependenciesStub1 name version
+                    Stub.getDependencies name version
                         |> Maybe.withDefault (Debug.todo "The name and version should exist")
 
                 depIncompats =
@@ -148,13 +149,6 @@ pickVersion availableVersions partialSolutionTerm =
 getDependencies : String -> Version -> Maybe (List ( String, Range ))
 getDependencies package version =
     Debug.todo "Should be implemented lazily"
-
-
-getDependenciesStub1 : String -> Version -> Maybe (List ( String, Range ))
-getDependenciesStub1 package version =
-    case ( package, version ) of
-        _ ->
-            Nothing
 
 
 unitPropagation : String -> String -> List Incompatibility -> PartialSolution -> Result String ( PartialSolution, List Incompatibility )
