@@ -88,8 +88,7 @@ potentialPackages partial =
         ( decisions, derivations ) =
             PartialSolution.splitDecisions partial ( Set.empty, Dict.empty )
     in
-    -- TODO: should also filter out packages with no positive derivation!
-    Dict.filter (\name _ -> not (Set.member name decisions)) derivations
+    Dict.filter (\name terms -> not (Set.member name decisions) && List.any Term.isPositive terms) derivations
 
 
 pickVersion : String -> (String -> List Version) -> List Term -> Maybe Version

@@ -1,4 +1,4 @@
-module Term exposing (Relation(..), Term(..), acceptVersion, contradicts, intersection, negate, relation, satisfies, union)
+module Term exposing (Relation(..), Term(..), acceptVersion, contradicts, intersection, isPositive, negate, relation, satisfies, union)
 
 import Range exposing (Range)
 import Version exposing (Version)
@@ -13,6 +13,16 @@ type Relation
     = Satisfies
     | Contradicts
     | Inconclusive
+
+
+isPositive : Term -> Bool
+isPositive term =
+    case term of
+        Positive _ ->
+            True
+
+        _ ->
+            False
 
 
 negate : Term -> Term
