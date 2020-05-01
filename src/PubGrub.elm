@@ -5,33 +5,32 @@ import Dict exposing (Dict)
 import Incompatibility exposing (Incompatibility)
 import PartialSolution exposing (PartialSolution)
 import Range exposing (Range)
-import Set exposing (Set)
+import Set
 import Term exposing (Term)
 import Version exposing (Version)
 
 
-solve : ()
-solve =
-    let
-        next =
-            Debug.todo "name of the root package"
+solve : String -> Result String (List { name : String, version : Version })
+solve root =
+    solveRec root root [ init root Version.one ] []
 
-        () =
-            Debug.todo "unit propagation on next to find new derivations"
 
-        () =
-            Debug.todo "if an incompatibity is satisfied, resolve conflict"
+solveRec : String -> String -> List Incompatibility -> PartialSolution -> Result String (List { name : String, version : Version })
+solveRec root package allIncompats partial =
+    case unitPropagation root package allIncompats partial of
+        Err msg ->
+            Err msg
 
-        () =
-            Debug.todo "in case failure to resolv conflict report an error"
+        Ok ( updatedPartial, updatedAllIncompats ) ->
+            let
+                ( next, updatedAgainAllIncompats, updatedAgainPartial ) =
+                    makeDecision (Debug.todo "listAvailableVersions") updatedAllIncompats updatedPartial
+            in
+            if PartialSolution.isSolution updatedPartial then
+                Ok (List.filterMap Assignment.finalDecision updatedPartial)
 
-        () =
-            Debug.todo "make a decision and set next to that new package name"
-
-        () =
-            Debug.todo "if no more work after decision making, we have a solution"
-    in
-    Debug.todo "solve"
+            else
+                solveRec root next updatedAgainAllIncompats updatedAgainPartial
 
 
 init : String -> Version -> Incompatibility

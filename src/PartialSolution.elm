@@ -178,23 +178,30 @@ it's a total solution and version solving has succeeded.
 -}
 isSolution : PartialSolution -> Bool
 isSolution partial =
-    case partial of
-        [] ->
+    isSolutionRec partial True
+
+
+isSolutionRec : PartialSolution -> Bool -> Bool
+isSolutionRec partial precondition =
+    case ( precondition, partial ) of
+        ( False, _ ) ->
+            False
+
+        ( True, [] ) ->
             True
 
-        assignment :: others ->
+        ( True, assignment :: others ) ->
             case assignment.kind of
                 Assignment.Decision ->
-                    isSolution others
+                    isSolutionRec others True
 
                 Assignment.Derivation _ ->
                     case assignment.term of
                         Term.Negative _ ->
-                            isSolution others
+                            isSolutionRec others True
 
                         Term.Positive _ ->
-                            -- BEWARE, not tail recursive
-                            Term.satisfies assignment.term (getDecision assignment.name others) && isSolution others
+                            isSolutionRec others (Term.satisfies assignment.term (getDecision assignment.name others))
 
 
 getDecision : String -> PartialSolution -> List Term

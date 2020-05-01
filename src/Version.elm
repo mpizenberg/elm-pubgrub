@@ -1,4 +1,4 @@
-module Version exposing (Version, bumpMajor, bumpMinor, bumpPatch, equals, higherThan, lowerThan, max, min, new)
+module Version exposing (Version, bumpMajor, bumpMinor, bumpPatch, equals, higherThan, lowerThan, max, min, new, one)
 
 
 type Version
@@ -11,6 +11,11 @@ type Version
 
 
 -- Constructor
+
+
+one : Version
+one =
+    Version { major = 1, minor = 0, patch = 0 }
 
 
 new : { major : Int, minor : Int, patch : Int } -> Version
