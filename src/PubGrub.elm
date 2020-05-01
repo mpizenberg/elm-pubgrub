@@ -73,6 +73,19 @@ pickPackageVersion partial listAllVersions =
     Debug.todo "TODO"
 
 
+{-| Heuristic to pick the next package to add to the partial solution.
+This should be a package with a positive derivation but no decision yet.
+If multiple choices are possible, use a heuristic.
+
+Pub chooses the package with the fewest versions
+matching the outstanding constraint.
+This tends to find conflicts earlier if any exist,
+since these packages will run out of versions to try more quickly.
+But there's likely room for improvement in these heuristics.
+
+Here we just pick the first one.
+
+-}
 pickPackage : PartialSolution -> ( String, List Term )
 pickPackage partial =
     potentialPackages partial
@@ -91,6 +104,9 @@ potentialPackages partial =
     Dict.filter (\name terms -> not (Set.member name decisions) && List.any Term.isPositive terms) derivations
 
 
+{-| Pub chooses the latest matching version of the package
+that match the outstanding constraint.
+-}
 pickVersion : String -> (String -> List Version) -> List Term -> Maybe Version
 pickVersion name listAllVersions partialSolutionTerms =
     Debug.todo "pickVersion"
