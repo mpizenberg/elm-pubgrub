@@ -39,6 +39,32 @@ init root version =
     Dict.singleton root (Term.Negative (Range.Exact version))
 
 
+makeDecision : (String -> List Version) -> List Incompatibility -> PartialSolution -> ( String, List Incompatibility, PartialSolution )
+makeDecision listAvailableVersions allIncompats partial =
+    case pickPackageVersion partial listAvailableVersions of
+        Err ( name, incompat ) ->
+            ( name, Incompatibility.merge incompat allIncompats, partial )
+
+        Ok ( name, version ) ->
+            let
+                dependencies =
+                    getDependenciesStub1 name version
+                        |> Maybe.withDefault (Debug.todo "The name and version should exist")
+
+                depIncompats =
+                    Incompatibility.fromDependencies name version dependencies
+
+                updatedAllIncompats =
+                    List.foldr Incompatibility.merge allIncompats depIncompats
+            in
+            case PartialSolution.canAddVersion name version depIncompats partial of
+                ( False, _ ) ->
+                    ( name, updatedAllIncompats, partial )
+
+                ( True, updatedPartial ) ->
+                    ( name, updatedAllIncompats, updatedPartial )
+
+
 {-| Heuristic to pick the next package & version to add to the partial solution.
 This should be a package with a positive derivation but no decision yet.
 If multiple choices are possible, use a heuristic.
@@ -64,22 +90,6 @@ pickPackageVersion partial listAvailableVersions =
     pickVersion (listAvailableVersions name) term
         |> Maybe.map (Tuple.pair name)
         |> Result.fromMaybe ( name, Dict.singleton name term )
-
-
-
--- TODO: function makeDecision
--- let
---     dependencies =
---         getDependenciesStub1 name version
---             |> Maybe.withDefault (Debug.todo "The name and version should exist")
---
---     depIncompats =
---         Incompatibility.fromDependencies name version dependencies
---
---     updatedAllIncompats =
---         List.foldr Incompatibility.merge allIncompats depIncompats
--- in
--- Debug.todo "TODO"
 
 
 {-| Heuristic to pick the next package to add to the partial solution.

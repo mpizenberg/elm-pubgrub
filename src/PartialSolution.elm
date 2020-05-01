@@ -1,4 +1,4 @@
-module PartialSolution exposing (PartialSolution, dropUntilLevel, findPreviousSatisfier, findSatisfier, isSolution, prependDecision, prependDerivation, splitDecisions, toDict)
+module PartialSolution exposing (PartialSolution, canAddVersion, dropUntilLevel, findPreviousSatisfier, findSatisfier, isSolution, prependDecision, prependDerivation, splitDecisions, toDict)
 
 import Assignment exposing (Assignment)
 import Dict exposing (Dict)
@@ -40,9 +40,13 @@ In practice I think it can only produce a conflict if one of the dependencies
 (which are used to make the new incompatibilities)
 is already in the partial solution with an incompatible version.
 -}
-canAddVersion : String -> Version -> List Incompatibility -> PartialSolution -> Bool
+canAddVersion : String -> Version -> List Incompatibility -> PartialSolution -> ( Bool, PartialSolution )
 canAddVersion name version newIncompatibilities partial =
-    doesNotSatisfy newIncompatibilities (toDict (prependDecision name (Term.Positive (Range.Exact version)) partial))
+    let
+        updatedPartial =
+            prependDecision name (Term.Positive (Range.Exact version)) partial
+    in
+    ( doesNotSatisfy newIncompatibilities (toDict updatedPartial), updatedPartial )
 
 
 doesNotSatisfy : List Incompatibility -> Dict String (List Term) -> Bool
