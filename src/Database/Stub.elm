@@ -20,7 +20,7 @@ listAvailableVersions =
 
 
 getDependencies1 package version =
-    case ( package, Version.toTuple version ) of
+    case Debug.log "getDependencies of package" ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
             Just [ ( "foo", Range.Between Version.one Version.two ) ]
 

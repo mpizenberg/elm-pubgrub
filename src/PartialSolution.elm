@@ -178,7 +178,7 @@ it's a total solution and version solving has succeeded.
 -}
 isSolution : PartialSolution -> Bool
 isSolution partial =
-    isSolutionRec partial True
+    isSolutionRec (List.reverse partial) True
 
 
 isSolutionRec : PartialSolution -> Bool -> Bool

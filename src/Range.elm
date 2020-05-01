@@ -67,12 +67,25 @@ intersection r1 r2 =
         ( None, _ ) ->
             None
 
+        ( _, None ) ->
+            None
+
         ( Any, _ ) ->
             r2
+
+        ( _, Any ) ->
+            r1
 
         ( Exact v1, _ ) ->
             if acceptVersion v1 r2 then
                 r1
+
+            else
+                None
+
+        ( _, Exact v2 ) ->
+            if acceptVersion v2 r1 then
+                r2
 
             else
                 None

@@ -18,20 +18,22 @@ solve root version =
 
 solveRec : String -> String -> List Incompatibility -> PartialSolution -> Result String (List { name : String, version : Version })
 solveRec root package allIncompats partial =
-    case unitPropagation root package allIncompats partial of
+    case unitPropagation root (Debug.log "unitPropagation" package) allIncompats partial of
         Err msg ->
             Err msg
 
         Ok ( updatedPartial, updatedAllIncompats ) ->
-            let
-                ( next, updatedAgainAllIncompats, updatedAgainPartial ) =
-                    makeDecision Stub.listAvailableVersions updatedAllIncompats updatedPartial
-            in
-            if PartialSolution.isSolution updatedPartial then
-                Ok (List.filterMap Assignment.finalDecision updatedPartial)
+            case makeDecision Stub.listAvailableVersions updatedAllIncompats updatedPartial of
+                Nothing ->
+                    if PartialSolution.isSolution updatedPartial then
+                        Ok (List.filterMap Assignment.finalDecision updatedPartial)
 
-            else
-                solveRec root next updatedAgainAllIncompats updatedAgainPartial
+                    else
+                        Err "Is this possible???"
+
+                Just ( next, updatedAgainAllIncompats, updatedAgainPartial ) ->
+                    -- if PartialSolution.isSolution updatedPartial then
+                    solveRec root next updatedAgainAllIncompats updatedAgainPartial
 
 
 init : String -> Version -> Incompatibility
@@ -39,17 +41,24 @@ init root version =
     Dict.singleton root (Term.Negative (Range.Exact version))
 
 
-makeDecision : (String -> List Version) -> List Incompatibility -> PartialSolution -> ( String, List Incompatibility, PartialSolution )
+makeDecision : (String -> List Version) -> List Incompatibility -> PartialSolution -> Maybe ( String, List Incompatibility, PartialSolution )
 makeDecision listAvailableVersions allIncompats partial =
     case pickPackageVersion partial listAvailableVersions of
-        Err ( name, incompat ) ->
-            ( name, Incompatibility.merge incompat allIncompats, partial )
+        Nothing ->
+            Nothing
 
-        Ok ( name, version ) ->
+        Just (Err ( name, incompat )) ->
+            Just ( name, Incompatibility.merge incompat allIncompats, partial )
+
+        Just (Ok ( name, version )) ->
             let
                 dependencies =
-                    Stub.getDependencies name version
-                        |> Maybe.withDefault (Debug.todo "The name and version should exist")
+                    case Stub.getDependencies name version of
+                        Just deps ->
+                            deps
+
+                        Nothing ->
+                            Debug.todo "The name and version should exist"
 
                 depIncompats =
                     Incompatibility.fromDependencies name version dependencies
@@ -59,10 +68,10 @@ makeDecision listAvailableVersions allIncompats partial =
             in
             case PartialSolution.canAddVersion name version depIncompats partial of
                 ( False, _ ) ->
-                    ( name, updatedAllIncompats, partial )
+                    Just ( name, updatedAllIncompats, partial )
 
                 ( True, updatedPartial ) ->
-                    ( name, updatedAllIncompats, updatedPartial )
+                    Just ( name, updatedAllIncompats, updatedPartial )
 
 
 {-| Heuristic to pick the next package & version to add to the partial solution.
@@ -81,15 +90,17 @@ If no version matches that term return an error with
 the package name and the incompatibity {term}.
 
 -}
-pickPackageVersion : PartialSolution -> (String -> List Version) -> Result ( String, Incompatibility ) ( String, Version )
+pickPackageVersion : PartialSolution -> (String -> List Version) -> Maybe (Result ( String, Incompatibility ) ( String, Version ))
 pickPackageVersion partial listAvailableVersions =
-    let
-        ( name, term ) =
-            pickPackage partial
-    in
-    pickVersion (listAvailableVersions name) term
-        |> Maybe.map (Tuple.pair name)
-        |> Result.fromMaybe ( name, Dict.singleton name term )
+    case pickPackage partial of
+        Just ( name, term ) ->
+            pickVersion (listAvailableVersions name) term
+                |> Maybe.map (Tuple.pair name)
+                |> Result.fromMaybe ( name, Dict.singleton name term )
+                |> Just
+
+        Nothing ->
+            Nothing
 
 
 {-| Heuristic to pick the next package to add to the partial solution.
@@ -105,13 +116,12 @@ But there's likely room for improvement in these heuristics.
 Here we just pick the first one.
 
 -}
-pickPackage : PartialSolution -> ( String, Term )
+pickPackage : PartialSolution -> Maybe ( String, Term )
 pickPackage partial =
     potentialPackages partial
         |> Dict.toList
         |> List.head
-        |> Maybe.withDefault (Debug.todo "Is it possible that there is no potential package?")
-        |> Tuple.mapSecond (Term.listIntersection Nothing)
+        |> Maybe.map (Tuple.mapSecond (Term.listIntersection Nothing))
 
 
 potentialPackages : PartialSolution -> Dict String (List Term)
@@ -182,7 +192,7 @@ unitPropagationLoop root package changed loopIncompatibilities allIncompats part
                                         let
                                             -- add not term to partial with incompat as cause
                                             partialWithNotTermInPriorCause =
-                                                PartialSolution.prependDerivation name term priorCause updatedPartial
+                                                PartialSolution.prependDerivation name (Term.negate term) priorCause updatedPartial
                                         in
                                         -- Replace changed with a set containing only term's package name.
                                         unitPropagationLoop root package [ name ] othersIncompat updatedAllIncompats partialWithNotTermInPriorCause
@@ -194,7 +204,7 @@ unitPropagationLoop root package changed loopIncompatibilities allIncompats part
                         let
                             updatedPartial =
                                 -- derivation :: partial
-                                PartialSolution.prependDerivation name term incompat partial
+                                PartialSolution.prependDerivation name (Term.negate term) incompat partial
                         in
                         unitPropagationLoop root package (name :: changed) othersIncompat allIncompats updatedPartial
 
@@ -223,7 +233,7 @@ conflictResolution incompatChanged root incompat allIncompats partial =
                     continueResolution incompatChanged root incompat allIncompats partial
 
             _ ->
-                Err "Not possible"
+                continueResolution incompatChanged root incompat allIncompats partial
 
     else
         -- TODO: tail rec
