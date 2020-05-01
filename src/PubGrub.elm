@@ -56,13 +56,16 @@ the package name and the incompatibity {term}.
 
 -}
 pickPackageVersion : PartialSolution -> (String -> List Version) -> Result () ()
-pickPackageVersion partial listAllVersions =
+pickPackageVersion partial listAvailableVersions =
     let
         ( name, terms ) =
             pickPackage partial
 
+        availableVersions =
+            listAvailableVersions name
+
         version =
-            pickVersion name listAllVersions terms
+            pickVersion availableVersions terms
 
         dependencies =
             Maybe.andThen (getDependencies name) version
@@ -106,10 +109,24 @@ potentialPackages partial =
 
 {-| Pub chooses the latest matching version of the package
 that match the outstanding constraint.
+
+Here we just pick the first one that satisfies the terms.
+Its the responsibility of the provider of `availableVersions`
+to list them with preferred versions first.
+
 -}
-pickVersion : String -> (String -> List Version) -> List Term -> Maybe Version
-pickVersion name listAllVersions partialSolutionTerms =
-    Debug.todo "pickVersion"
+pickVersion : List Version -> List Term -> Maybe Version
+pickVersion availableVersions partialSolutionTerms =
+    case availableVersions of
+        [] ->
+            Nothing
+
+        v :: others ->
+            if Term.contradicts (Term.Positive (Range.Exact v)) partialSolutionTerms then
+                pickVersion others partialSolutionTerms
+
+            else
+                Just v
 
 
 getDependencies : String -> Version -> Maybe (List ( String, Range ))
