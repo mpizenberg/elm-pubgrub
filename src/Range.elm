@@ -112,6 +112,16 @@ intersection r1 r2 =
             else
                 None
 
+        ( DifferentThan v1, DifferentThan v2 ) ->
+            if v1 == v2 then
+                DifferentThan v1
+
+            else if Version.higherThan v1 v2 then
+                Union (LowerThan v1) (union (normalizedBetween (Version.bumpPatch v1) v2) (HigherThan (Version.bumpPatch v2)))
+
+            else
+                Union (LowerThan v2) (union (normalizedBetween (Version.bumpPatch v2) v1) (HigherThan (Version.bumpPatch v1)))
+
         ( DifferentThan v1, HigherThan v2 ) ->
             if Version.higherThan v1 v2 then
                 r2
@@ -120,11 +130,11 @@ intersection r1 r2 =
                 HigherThan (Version.bumpPatch v2)
 
             else
-                Union (normalizedBetween v2 v1) (HigherThan (Version.bumpPatch v1))
+                union (normalizedBetween v2 v1) (HigherThan (Version.bumpPatch v1))
 
         ( DifferentThan v1, LowerThan v2 ) ->
             if Version.higherThan v1 v2 then
-                Union (LowerThan v1) (normalizedBetween (Version.bumpPatch v1) v2)
+                union (LowerThan v1) (normalizedBetween (Version.bumpPatch v1) v2)
 
             else
                 r2
@@ -137,14 +147,14 @@ intersection r1 r2 =
                 normalizedBetween (Version.bumpPatch v1) v3
 
             else if Version.higherThan v1 v3 then
-                Union (Between v2 v1) (normalizedBetween (Version.bumpPatch v1) v3)
+                union (Between v2 v1) (normalizedBetween (Version.bumpPatch v1) v3)
 
             else
                 r2
 
         ( DifferentThan v1, Outside v2 v3 ) ->
             if Version.higherThan v1 v2 then
-                Union (LowerThan v1) (Union (normalizedBetween (Version.bumpPatch v1) v2) (HigherThan v3))
+                Union (LowerThan v1) (union (normalizedBetween (Version.bumpPatch v1) v2) (HigherThan v3))
 
             else if Version.higherThan v1 v3 then
                 r2
@@ -153,14 +163,7 @@ intersection r1 r2 =
                 Outside v2 (Version.bumpPatch v3)
 
             else
-                Union (LowerThan v2) (Union (Between v3 v1) (HigherThan v1))
-
-        ( DifferentThan v1, _ ) ->
-            if acceptVersion v1 r2 then
-                Intersection r1 r2
-
-            else
-                r2
+                Union (LowerThan v2) (Union (Between v3 v1) (HigherThan (Version.bumpPatch v1)))
 
         ( HigherThan v1, HigherThan v2 ) ->
             HigherThan (Version.max v1 v2)
@@ -172,7 +175,7 @@ intersection r1 r2 =
             normalizedBetween (Version.max v1 v2) v3
 
         ( HigherThan v1, Outside v2 v3 ) ->
-            if Version.lowerThan v2 v1 then
+            if Version.higherThan v1 v2 then
                 Union (Between v1 v2) (HigherThan v3)
 
             else
@@ -236,13 +239,13 @@ intersection r1 r2 =
 
 reduceIntersection : Range -> Range -> Range
 reduceIntersection r1 r2 =
+    -- intersection r1 r2
+    --
     -- TODO: is this gonna loop indefinitely?
     -- YES!
     -- Example 3 triggers a maximum call stack exception.
     -- So it loops indefinitely and furthermore,
     -- the "intersection" function is not tail call optimized.
-    --
-    -- intersection r1 r2
     --
     -- Maybe we should copy the intersection function but just replace "reduceIntersection"
     -- and "reduceUnion" by "Intersection" and "Union"?
@@ -273,6 +276,16 @@ reduceIntersection r1 r2 =
             else
                 None
 
+        ( DifferentThan v1, DifferentThan v2 ) ->
+            if v1 == v2 then
+                DifferentThan v1
+
+            else if Version.higherThan v1 v2 then
+                Union (LowerThan v1) (reduceUnion (normalizedBetween (Version.bumpPatch v1) v2) (HigherThan (Version.bumpPatch v2)))
+
+            else
+                Union (LowerThan v2) (reduceUnion (normalizedBetween (Version.bumpPatch v2) v1) (HigherThan (Version.bumpPatch v1)))
+
         ( DifferentThan v1, HigherThan v2 ) ->
             if Version.higherThan v1 v2 then
                 r2
@@ -281,11 +294,11 @@ reduceIntersection r1 r2 =
                 HigherThan (Version.bumpPatch v2)
 
             else
-                Union (normalizedBetween v2 v1) (HigherThan (Version.bumpPatch v1))
+                reduceUnion (normalizedBetween v2 v1) (HigherThan (Version.bumpPatch v1))
 
         ( DifferentThan v1, LowerThan v2 ) ->
             if Version.higherThan v1 v2 then
-                Union (LowerThan v1) (normalizedBetween (Version.bumpPatch v1) v2)
+                reduceUnion (LowerThan v1) (normalizedBetween (Version.bumpPatch v1) v2)
 
             else
                 r2
@@ -298,14 +311,14 @@ reduceIntersection r1 r2 =
                 normalizedBetween (Version.bumpPatch v1) v3
 
             else if Version.higherThan v1 v3 then
-                Union (Between v2 v1) (normalizedBetween (Version.bumpPatch v1) v3)
+                reduceUnion (Between v2 v1) (normalizedBetween (Version.bumpPatch v1) v3)
 
             else
                 r2
 
         ( DifferentThan v1, Outside v2 v3 ) ->
             if Version.higherThan v1 v2 then
-                Union (LowerThan v1) (Union (normalizedBetween (Version.bumpPatch v1) v2) (HigherThan v3))
+                Union (LowerThan v1) (reduceUnion (normalizedBetween (Version.bumpPatch v1) v2) (HigherThan v3))
 
             else if Version.higherThan v1 v3 then
                 r2
@@ -314,14 +327,7 @@ reduceIntersection r1 r2 =
                 Outside v2 (Version.bumpPatch v3)
 
             else
-                Union (LowerThan v2) (Union (Between v3 v1) (HigherThan v1))
-
-        ( DifferentThan v1, _ ) ->
-            if acceptVersion v1 r2 then
-                Intersection r1 r2
-
-            else
-                r2
+                Union (LowerThan v2) (Union (Between v3 v1) (HigherThan (Version.bumpPatch v1)))
 
         ( HigherThan v1, HigherThan v2 ) ->
             HigherThan (Version.max v1 v2)
@@ -333,7 +339,7 @@ reduceIntersection r1 r2 =
             normalizedBetween (Version.max v1 v2) v3
 
         ( HigherThan v1, Outside v2 v3 ) ->
-            if Version.lowerThan v2 v1 then
+            if Version.higherThan v1 v2 then
                 Union (Between v1 v2) (HigherThan v3)
 
             else
