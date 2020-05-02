@@ -6,12 +6,12 @@ import Version exposing (Version)
 
 getDependencies : String -> Version -> Maybe (List ( String, Range ))
 getDependencies =
-    getDependencies2
+    getDependencies3
 
 
 listAvailableVersions : String -> List Version
 listAvailableVersions =
-    listAvailableVersions2
+    listAvailableVersions3
 
 
 
@@ -96,6 +96,45 @@ getDependencies2 package version =
 
         ( "bar", ( 2, 0, 0 ) ) ->
             Just []
+
+        _ ->
+            Nothing
+
+
+
+-- Example 3: performing conflict resolution
+-- https://github.com/dart-lang/pub/blob/master/doc/solver.md#performing-conflict-resolution
+
+
+listAvailableVersions3 package =
+    case package of
+        "root" ->
+            [ Version.one ]
+
+        "foo" ->
+            [ Version.one, Version.two ]
+                |> List.reverse
+
+        "bar" ->
+            [ Version.one ]
+
+        _ ->
+            []
+
+
+getDependencies3 package version =
+    case Debug.log "getDependencies of package" ( package, Version.toTuple version ) of
+        ( "root", ( 1, 0, 0 ) ) ->
+            Just [ ( "foo", Range.HigherThan Version.one ) ]
+
+        ( "foo", ( 2, 0, 0 ) ) ->
+            Just [ ( "bar", Range.Between Version.one Version.two ) ]
+
+        ( "foo", ( 1, 0, 0 ) ) ->
+            Just []
+
+        ( "bar", ( 1, 0, 0 ) ) ->
+            Just [ ( "foo", Range.Between Version.one Version.two ) ]
 
         _ ->
             Nothing

@@ -120,8 +120,19 @@ dropUntilLevel level partial =
 
 findSatisfier : Incompatibility -> PartialSolution -> ( Assignment, PartialSolution, Term )
 findSatisfier incompat partial =
-    Utils.find (searchSatisfier incompat) partial
-        |> Maybe.withDefault (Debug.todo "should always find something")
+    case Utils.find (searchSatisfier incompat) partial of
+        Just x ->
+            x
+
+        Nothing ->
+            let
+                _ =
+                    Debug.log "incompat" incompat
+
+                _ =
+                    Debug.log "partial" partial
+            in
+            Debug.todo "should always find something"
 
 
 findPreviousSatisfier : Assignment -> Incompatibility -> PartialSolution -> Maybe ( Assignment, PartialSolution, Term )
@@ -153,12 +164,23 @@ searchSatisfier incompat { left, right } assignment earlierAssignments =
         -- if it satisfies, search right (earlier assignments)
         Incompatibility.Satisfies ->
             if right == 0 then
-                Found <|
-                    ( assignment
-                    , earlierAssignments
-                    , Dict.get assignment.name incompat
-                        |> Maybe.withDefault (Debug.todo "term should exist")
-                    )
+                case Dict.get assignment.name incompat of
+                    Just term ->
+                        Found
+                            ( assignment
+                            , earlierAssignments
+                            , term
+                            )
+
+                    Nothing ->
+                        let
+                            _ =
+                                Debug.log "assignment" assignment
+
+                            _ =
+                                Debug.log "incompat" incompat
+                        in
+                        Debug.todo "term should exist"
 
             else
                 KeepGoRight (max 1 (right // 2))
