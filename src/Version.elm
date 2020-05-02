@@ -1,4 +1,4 @@
-module Version exposing (Version, bumpMajor, bumpMinor, bumpPatch, equals, fromTuple, higherThan, lowerThan, max, min, new, new_, one, toTuple, two)
+module Version exposing (Version, bumpMajor, bumpMinor, bumpPatch, equals, fromTuple, higherThan, lowerThan, max, min, new, new_, one, three, toTuple, two)
 
 
 type Version
@@ -21,6 +21,11 @@ one =
 two : Version
 two =
     Version { major = 2, minor = 0, patch = 0 }
+
+
+three : Version
+three =
+    Version { major = 3, minor = 0, patch = 0 }
 
 
 new : { major : Int, minor : Int, patch : Int } -> Version

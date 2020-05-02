@@ -256,6 +256,10 @@ continueResolution incompatChanged root incompat allIncompats partial =
 
         previousSatisfierLevel =
             Maybe.map (\( a, _, _ ) -> a.decisionLevel) maybePreviousSatisfier
+                -- TODO: According to PubGrub doc, decision level 1 is the decision level
+                -- where root package was selected,
+                -- however I see in the examples that the root level corresponds to decision level 0 ...
+                -- To be clarified.
                 |> Maybe.withDefault 1
     in
     case satisfier.kind of

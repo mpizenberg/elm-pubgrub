@@ -14,6 +14,10 @@ type Range
       -- lower bound included such as: vLow <= v < vHigh
     | Between Version Version
     | Outside Version Version
+      -- For when the intersection cannot be reduced
+      -- Added because otherwise example 2 cannot be solved
+    | Intersection Range Range
+    | Union Range Range
 
 
 equals : Range -> Range -> Bool
@@ -43,6 +47,24 @@ equals r1 r2 =
         ( Outside v1 v2, Outside v3 v4 ) ->
             Version.equals v1 v3 && Version.equals v2 v4
 
+        -- This might not be totally right?
+        ( Intersection r11 r12, Intersection r21 r22 ) ->
+            (equals r11 r21 && equals r12 r22)
+                || (equals r11 r22 && equals r12 r21)
+
+        -- This might not be totally right?
+        ( Union r11 r12, Union r21 r22 ) ->
+            (equals r11 r21 && equals r12 r22)
+                || (equals r11 r22 && equals r12 r21)
+
+        -- This might not be totally right?
+        ( Intersection _ _, Union _ _ ) ->
+            equals r1 (negate r2)
+
+        -- This might not be totally right?
+        ( Union _ _, Intersection _ _ ) ->
+            equals r1 (negate r2)
+
         _ ->
             False
 
@@ -63,7 +85,7 @@ union r1 r2 =
 
 intersection : Range -> Range -> Range
 intersection r1 r2 =
-    case ( r1, r2 ) of
+    case Debug.log "Range.intersection" ( r1, r2 ) of
         ( None, _ ) ->
             None
 
@@ -90,9 +112,10 @@ intersection r1 r2 =
             else
                 None
 
+        -- TODO: We should detail cases where v1 corresponds to the end of a segment
         ( DifferentThan v1, _ ) ->
             if acceptVersion v1 r2 then
-                Debug.todo "Not handling the case of a 'hole' in a set"
+                Intersection r1 r2
 
             else
                 r2
@@ -108,7 +131,7 @@ intersection r1 r2 =
 
         ( HigherThan v1, Outside v2 v3 ) ->
             if Version.lowerThan v2 v1 then
-                Debug.todo "Not handling the union of two segments"
+                Union (Between v1 v2) (HigherThan v3)
 
             else
                 HigherThan (Version.max v1 v3)
@@ -121,7 +144,7 @@ intersection r1 r2 =
 
         ( LowerThan v1, Outside v2 v3 ) ->
             if Version.higherThan v3 v1 then
-                Debug.todo "Not handling the union of two segments"
+                Union (LowerThan v2) (Between v3 v1)
 
             else
                 LowerThan (Version.min v1 v2)
@@ -138,7 +161,7 @@ intersection r1 r2 =
                     Version.higherThan v4 v2
             in
             if v1v3 && v4v2 then
-                Debug.todo "Not handling the union of two segments"
+                Union (Between v1 v3) (Between v4 v2)
 
             else if v1v3 then
                 normalizedBetween v1 (Version.min v2 v3)
@@ -150,14 +173,36 @@ intersection r1 r2 =
                 None
 
         ( Outside v1 v2, Outside v3 v4 ) ->
-            if Version.higherThan v4 v1 || Version.higherThan v2 v3 then
-                Debug.todo "Not handling the union of two segments"
+            if Version.higherThan v4 v1 then
+                Union (LowerThan v3) (Union (Between v4 v1) (HigherThan v2))
+
+            else if Version.higherThan v2 v3 then
+                Union (LowerThan v1) (Union (Between v2 v3) (HigherThan v4))
 
             else
                 Outside (Version.min v1 v3) (Version.max v2 v4)
 
+        ( Intersection r11 r12, _ ) ->
+            reduceIntersection (intersection r11 r2) (intersection r12 r2)
+
+        ( Union r11 r12, _ ) ->
+            reduceUnion (intersection r11 r2) (intersection r12 r2)
+
         _ ->
             intersection r2 r1
+
+
+reduceIntersection : Range -> Range -> Range
+reduceIntersection r1 r2 =
+    -- Is this gonna loop indefinitely?
+    -- Maybe we should copy the intersection function but just replace "reduceIntersection"
+    -- and "reduceUnion" by "Intersection" and "Union"?
+    intersection r1 r2
+
+
+reduceUnion : Range -> Range -> Range
+reduceUnion r1 r2 =
+    negate (reduceIntersection (negate r1) (negate r2))
 
 
 negate : Range -> Range
@@ -186,6 +231,12 @@ negate range =
 
         Outside vLow vHigh ->
             Between vLow vHigh
+
+        Intersection r1 r2 ->
+            Union (negate r1) (negate r2)
+
+        Union r1 r2 ->
+            Intersection (negate r1) (negate r2)
 
 
 acceptVersion : Version -> Range -> Bool
@@ -218,3 +269,9 @@ acceptVersion version range =
             Version.lowerThan vLow version
                 || Version.equals vHigh version
                 || Version.higherThan vHigh version
+
+        Intersection r1 r2 ->
+            acceptVersion version r1 && acceptVersion version r2
+
+        Union r1 r2 ->
+            acceptVersion version r1 || acceptVersion version r2
