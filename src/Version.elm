@@ -1,4 +1,4 @@
-module Version exposing (Version, bumpMajor, bumpMinor, bumpPatch, equals, fromTuple, higherThan, lowerThan, max, min, new, new_, one, three, toTuple, two)
+module Version exposing (Version, bumpMajor, bumpMinor, bumpPatch, equals, fromTuple, higherThan, lowerThan, max, min, new, new_, one, three, toDebugString, toTuple, two)
 
 
 type Version
@@ -7,6 +7,17 @@ type Version
         , minor : Int
         , patch : Int
         }
+
+
+
+-- Debug
+
+
+toDebugString : Version -> String
+toDebugString (Version { major, minor, patch }) =
+    [ major, minor, patch ]
+        |> List.map String.fromInt
+        |> String.join "."
 
 
 

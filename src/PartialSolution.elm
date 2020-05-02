@@ -1,4 +1,4 @@
-module PartialSolution exposing (PartialSolution, canAddVersion, dropUntilLevel, encode, findPreviousSatisfier, findSatisfier, isSolution, prependDecision, prependDerivation, splitDecisions, toDict)
+module PartialSolution exposing (PartialSolution, canAddVersion, dropUntilLevel, encode, findPreviousSatisfier, findSatisfier, isSolution, prependDecision, prependDerivation, splitDecisions, toDebugString, toDict)
 
 import Assignment exposing (Assignment)
 import Dict exposing (Dict)
@@ -21,12 +21,17 @@ type alias PartialSolution =
 
 
 
--- Encoders (for debug)
+-- Debug
+
+
+toDebugString : PartialSolution -> String
+toDebugString partial =
+    Json.Encode.encode 2 (encode partial)
 
 
 encode : PartialSolution -> Value
 encode partial =
-    Json.Encode.list Assignment.encode partial
+    Json.Encode.list Assignment.encodeDebug partial
 
 
 

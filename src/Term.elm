@@ -1,4 +1,4 @@
-module Term exposing (Relation(..), Term(..), acceptVersion, acceptVersionJust, contradicts, intersection, isPositive, listIntersection, negate, relation, satisfies, union)
+module Term exposing (Relation(..), Term(..), acceptVersion, acceptVersionJust, contradicts, intersection, isPositive, listIntersection, negate, relation, satisfies, toDebugString, union)
 
 import Range exposing (Range)
 import Version exposing (Version)
@@ -13,6 +13,24 @@ type Relation
     = Satisfies
     | Contradicts
     | Inconclusive
+
+
+
+-- Debug
+
+
+toDebugString : Term -> String
+toDebugString term =
+    case term of
+        Positive range ->
+            Range.toDebugString range
+
+        Negative range ->
+            "Not ( " ++ Range.toDebugString range ++ " )"
+
+
+
+-- Functions
 
 
 isPositive : Term -> Bool

@@ -1,4 +1,4 @@
-module Range exposing (Range(..), acceptVersion, equals, intersection, negate, union)
+module Range exposing (Range(..), acceptVersion, equals, intersection, negate, toDebugString, union)
 
 import Version exposing (Version)
 
@@ -18,6 +18,48 @@ type Range
       -- Added because otherwise example 2 cannot be solved
     | Intersection Range Range
     | Union Range Range
+
+
+
+-- Debug
+
+
+toDebugString : Range -> String
+toDebugString range =
+    case range of
+        None ->
+            "∅"
+
+        Any ->
+            "∗"
+
+        Exact v ->
+            "v = " ++ Version.toDebugString v
+
+        DifferentThan v ->
+            "v /= " ++ Version.toDebugString v
+
+        HigherThan v ->
+            Version.toDebugString v ++ " <= v"
+
+        LowerThan v ->
+            "v < " ++ Version.toDebugString v
+
+        Between v1 v2 ->
+            Version.toDebugString v1 ++ " <= v < " ++ Version.toDebugString v2
+
+        Outside v1 v2 ->
+            "v < " ++ Version.toDebugString v1 ++ "  |  " ++ Version.toDebugString v2 ++ " <= v"
+
+        Intersection r1 r2 ->
+            "( " ++ toDebugString r1 ++ " ) ⋂  ( " ++ toDebugString r2 ++ " )"
+
+        Union r1 r2 ->
+            "( " ++ toDebugString r1 ++ " ) ⋃  ( " ++ toDebugString r2 ++ " )"
+
+
+
+-- Functions
 
 
 equals : Range -> Range -> Bool

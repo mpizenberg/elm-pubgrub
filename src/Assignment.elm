@@ -1,4 +1,4 @@
-module Assignment exposing (Assignment, Kind(..), encode, finalDecision, newDecision, newDerivation)
+module Assignment exposing (Assignment, Kind(..), encodeDebug, finalDecision, newDecision, newDerivation)
 
 import Incompatibility exposing (Incompatibility)
 import Json.Encode exposing (Value)
@@ -23,16 +23,16 @@ type Kind {- Decision: individual package ids -}
 
 
 
--- Encoders (for debug)
+-- Debug
 
 
-encode : Assignment -> Value
-encode { name, term, decisionLevel, kind } =
+encodeDebug : Assignment -> Value
+encodeDebug { name, term, decisionLevel, kind } =
     Json.Encode.object
         [ ( "kind", Json.Encode.string (kindToString kind) )
         , ( "name", Json.Encode.string name )
         , ( "decisionLevel", Json.Encode.int decisionLevel )
-        , ( "term", Json.Encode.string (Debug.toString term) )
+        , ( "term", Json.Encode.string (Term.toDebugString term) )
         ]
 
 

@@ -1,6 +1,7 @@
-module Incompatibility exposing (Incompatibility, Relation(..), fromDependencies, merge, priorCause, relation, termUnion)
+module Incompatibility exposing (Incompatibility, Relation(..), fromDependencies, merge, priorCause, relation, termUnion, toDebugString)
 
 import Dict exposing (Dict)
+import Json.Encode
 import Range exposing (Range)
 import Term exposing (Term)
 import Version exposing (Version)
@@ -15,6 +16,23 @@ type Relation
     | AlmostSatisfies String Term
     | Contradicts String Term
     | Inconclusive
+
+
+
+-- Debug
+
+
+toDebugString : Incompatibility -> String
+toDebugString incompat =
+    Json.Encode.encode 2 <|
+        Json.Encode.dict
+            identity
+            (\term -> Json.Encode.string (Term.toDebugString term))
+            incompat
+
+
+
+-- Functions
 
 
 {-| Generate a list of incompatibilities from direct dependencies of a package.
