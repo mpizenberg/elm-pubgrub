@@ -33,7 +33,7 @@ solveRec root package allIncompats partial =
 
                 Just ( next, updatedAgainAllIncompats, updatedAgainPartial ) ->
                     -- if PartialSolution.isSolution updatedPartial then
-                    solveRec root next updatedAgainAllIncompats updatedAgainPartial
+                    solveRec root (Debug.log "Decision:" next) updatedAgainAllIncompats updatedAgainPartial
 
 
 init : String -> Version -> Incompatibility
@@ -219,7 +219,7 @@ unitPropagationLoop root package changed loopIncompatibilities allIncompats part
 -}
 conflictResolution : Bool -> String -> Incompatibility -> List Incompatibility -> PartialSolution -> Result String ( PartialSolution, Incompatibility, List Incompatibility )
 conflictResolution incompatChanged root incompat allIncompats partial =
-    if Dict.isEmpty incompat then
+    if Dict.isEmpty (Debug.log "\nconflictResolution incompat" incompat) then
         Err reportError
 
     else if Dict.size incompat == 1 then

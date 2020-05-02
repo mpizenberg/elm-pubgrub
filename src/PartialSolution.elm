@@ -1,8 +1,9 @@
-module PartialSolution exposing (PartialSolution, canAddVersion, dropUntilLevel, findPreviousSatisfier, findSatisfier, isSolution, prependDecision, prependDerivation, splitDecisions, toDict)
+module PartialSolution exposing (PartialSolution, canAddVersion, dropUntilLevel, encode, findPreviousSatisfier, findSatisfier, isSolution, prependDecision, prependDerivation, splitDecisions, toDict)
 
 import Assignment exposing (Assignment)
 import Dict exposing (Dict)
 import Incompatibility exposing (Incompatibility)
+import Json.Encode exposing (Value)
 import Range
 import Set exposing (Set)
 import Term exposing (Term)
@@ -17,6 +18,19 @@ This could be fun to benchmark :)
 -}
 type alias PartialSolution =
     List Assignment
+
+
+
+-- Encoders (for debug)
+
+
+encode : PartialSolution -> Value
+encode partial =
+    Json.Encode.list Assignment.encode partial
+
+
+
+-- Functions
 
 
 splitDecisions : PartialSolution -> ( Set String, Dict String (List Term) ) -> ( Set String, Dict String (List Term) )
@@ -120,33 +134,21 @@ dropUntilLevel level partial =
 
 findSatisfier : Incompatibility -> PartialSolution -> ( Assignment, PartialSolution, Term )
 findSatisfier incompat partial =
-    case Utils.find (searchSatisfier incompat) partial of
+    case Utils.find (searchSatisfier incompat (::)) partial of
         Just x ->
             x
 
         Nothing ->
-            let
-                _ =
-                    Debug.log "incompat" incompat
-
-                _ =
-                    Debug.log "partial" partial
-            in
             Debug.todo "should always find something"
-
-
-findPreviousSatisfier : Assignment -> Incompatibility -> PartialSolution -> Maybe ( Assignment, PartialSolution, Term )
-findPreviousSatisfier satisfier incompat earlierPartial =
-    Utils.find (searchPreviousSatisfier satisfier incompat) earlierPartial
 
 
 {-| Earliest assignment in the partial solution before satisfier
 such that incompatibility is satisfied by the partial solution up to
 and including that assignment plus satisfier.
 -}
-searchPreviousSatisfier : Assignment -> Incompatibility -> { left : Int, right : Int } -> Assignment -> List Assignment -> SearchDecision ( Assignment, PartialSolution, Term )
-searchPreviousSatisfier satisfier incompat sides assignment earlierAssignments =
-    searchSatisfier incompat sides assignment (satisfier :: earlierAssignments)
+findPreviousSatisfier : Assignment -> Incompatibility -> PartialSolution -> Maybe ( Assignment, PartialSolution, Term )
+findPreviousSatisfier satisfier incompat earlierPartial =
+    Utils.find (searchSatisfier incompat (\ass early -> satisfier :: ass :: early)) earlierPartial
 
 
 {-| A satisfier is the earliest assignment in partial solution such that the incompatibility
@@ -154,11 +156,11 @@ is satisfied by the partial solution up to and including that assignment.
 Also returns all assignments earlier than the satisfier.
 We call the term in the incompatibility that refers to the same package "term".
 -}
-searchSatisfier : Incompatibility -> { left : Int, right : Int } -> Assignment -> List Assignment -> SearchDecision ( Assignment, PartialSolution, Term )
-searchSatisfier incompat { left, right } assignment earlierAssignments =
+searchSatisfier : Incompatibility -> (Assignment -> List Assignment -> PartialSolution) -> { left : Int, right : Int } -> Assignment -> List Assignment -> SearchDecision ( Assignment, PartialSolution, Term )
+searchSatisfier incompat buildPartial { left, right } assignment earlierAssignments =
     let
         partial =
-            assignment :: earlierAssignments
+            buildPartial assignment earlierAssignments
     in
     case Incompatibility.relation incompat (toDict partial) of
         -- if it satisfies, search right (earlier assignments)
@@ -173,14 +175,7 @@ searchSatisfier incompat { left, right } assignment earlierAssignments =
                             )
 
                     Nothing ->
-                        let
-                            _ =
-                                Debug.log "assignment" assignment
-
-                            _ =
-                                Debug.log "incompat" incompat
-                        in
-                        Debug.todo "term should exist"
+                        Stop
 
             else
                 KeepGoRight (max 1 (right // 2))

@@ -1,6 +1,7 @@
-module Assignment exposing (Assignment, Kind(..), finalDecision, newDecision, newDerivation)
+module Assignment exposing (Assignment, Kind(..), encode, finalDecision, newDecision, newDerivation)
 
 import Incompatibility exposing (Incompatibility)
+import Json.Encode exposing (Value)
 import Range
 import Term exposing (Term)
 import Version exposing (Version)
@@ -19,6 +20,34 @@ type Kind {- Decision: individual package ids -}
       -- Derivation: "ranges" terms that must be true
       -- given previous assignments and all incompatibilities
     | Derivation { cause : Incompatibility }
+
+
+
+-- Encoders (for debug)
+
+
+encode : Assignment -> Value
+encode { name, term, decisionLevel, kind } =
+    Json.Encode.object
+        [ ( "kind", Json.Encode.string (kindToString kind) )
+        , ( "name", Json.Encode.string name )
+        , ( "decisionLevel", Json.Encode.int decisionLevel )
+        , ( "term", Json.Encode.string (Debug.toString term) )
+        ]
+
+
+kindToString : Kind -> String
+kindToString kind =
+    case kind of
+        Decision ->
+            "Decision"
+
+        Derivation _ ->
+            "Derivation"
+
+
+
+-- Functions
 
 
 finalDecision : Assignment -> Maybe { name : String, version : Version }

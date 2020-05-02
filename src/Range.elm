@@ -85,7 +85,7 @@ union r1 r2 =
 
 intersection : Range -> Range -> Range
 intersection r1 r2 =
-    case Debug.log "Range.intersection" ( r1, r2 ) of
+    case ( r1, r2 ) of
         ( None, _ ) ->
             None
 
@@ -228,7 +228,7 @@ intersection r1 r2 =
             reduceIntersection (intersection r11 r2) (intersection r12 r2)
 
         ( Union r11 r12, _ ) ->
-            Debug.log "reduceUnion" reduceUnion (intersection r11 r2) (intersection r12 r2)
+            reduceUnion (intersection r11 r2) (intersection r12 r2)
 
         _ ->
             intersection r2 r1
@@ -246,7 +246,7 @@ reduceIntersection r1 r2 =
     --
     -- Maybe we should copy the intersection function but just replace "reduceIntersection"
     -- and "reduceUnion" by "Intersection" and "Union"?
-    case Debug.log "Range.reduceIntersection" ( r1, r2 ) of
+    case ( r1, r2 ) of
         ( None, _ ) ->
             None
 
