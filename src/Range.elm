@@ -273,7 +273,49 @@ reduceIntersection r1 r2 =
             else
                 None
 
-        -- TODO: We should detail cases where v1 corresponds to the end of a segment
+        ( DifferentThan v1, HigherThan v2 ) ->
+            if Version.higherThan v1 v2 then
+                r2
+
+            else if Version.equals v1 v2 then
+                HigherThan (Version.bumpPatch v2)
+
+            else
+                Union (normalizedBetween v2 v1) (HigherThan (Version.bumpPatch v1))
+
+        ( DifferentThan v1, LowerThan v2 ) ->
+            if Version.higherThan v1 v2 then
+                Union (LowerThan v1) (normalizedBetween (Version.bumpPatch v1) v2)
+
+            else
+                r2
+
+        ( DifferentThan v1, Between v2 v3 ) ->
+            if Version.higherThan v1 v2 then
+                r2
+
+            else if Version.equals v1 v2 then
+                normalizedBetween (Version.bumpPatch v1) v3
+
+            else if Version.higherThan v1 v3 then
+                Union (Between v2 v1) (normalizedBetween (Version.bumpPatch v1) v3)
+
+            else
+                r2
+
+        ( DifferentThan v1, Outside v2 v3 ) ->
+            if Version.higherThan v1 v2 then
+                Union (LowerThan v1) (Union (normalizedBetween (Version.bumpPatch v1) v2) (HigherThan v3))
+
+            else if Version.higherThan v1 v3 then
+                r2
+
+            else if Version.equals v1 v3 then
+                Outside v2 (Version.bumpPatch v3)
+
+            else
+                Union (LowerThan v2) (Union (Between v3 v1) (HigherThan v1))
+
         ( DifferentThan v1, _ ) ->
             if acceptVersion v1 r2 then
                 Intersection r1 r2
