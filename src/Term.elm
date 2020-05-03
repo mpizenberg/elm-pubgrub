@@ -62,11 +62,11 @@ relation term set =
         fullIntersection =
             intersection term setIntersection
     in
-    if equals (Positive Range.None) fullIntersection then
-        Contradicts
-
-    else if equals setIntersection fullIntersection then
+    if equals setIntersection fullIntersection then
         Satisfies
+
+    else if equals (Positive Range.None) fullIntersection then
+        Contradicts
 
     else
         Inconclusive
