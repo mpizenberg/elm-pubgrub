@@ -100,6 +100,13 @@ termUnion name term incompat =
             Dict.insert name (Term.union term baseTerm) incompat
 
 
+{-| We say that a set of terms S satisfies an incompatibility I
+if S satisfies every term in I.
+We say that S contradicts I
+if S contradicts at least one term in I.
+If S satisfies all but one of I's terms and is inconclusive for the remaining term,
+we say S "almost satisfies" I and we call the remaining term the "unsatisfied term".
+-}
 relation : Incompatibility -> Dict String (List Term) -> Relation
 relation incompat set =
     relationStep set (Dict.toList incompat) Satisfies
