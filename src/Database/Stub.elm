@@ -20,7 +20,7 @@ listAvailableVersions =
 
 
 getDependencies1 package version =
-    case Debug.log "getDependencies of package" ( package, Version.toTuple version ) of
+    case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
             Just [ ( "foo", Range.Between Version.one Version.two ) ]
 
@@ -75,7 +75,7 @@ listAvailableVersions2 package =
 
 
 getDependencies2 package version =
-    case Debug.log "getDependencies of package" ( package, Version.toTuple version ) of
+    case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
             Just
                 [ ( "foo", Range.Between Version.one Version.two )
@@ -123,7 +123,7 @@ listAvailableVersions3 package =
 
 
 getDependencies3 package version =
-    case Debug.log "getDependencies of package" ( package, Version.toTuple version ) of
+    case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
             Just [ ( "foo", Range.HigherThan Version.one ) ]
 
@@ -171,7 +171,7 @@ listAvailableVersions4 package =
 
 
 getDependencies4 package version =
-    case Debug.log "getDependencies of package" ( package, Version.toTuple version ) of
+    case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
             Just
                 [ ( "foo", Range.Between Version.one Version.two )

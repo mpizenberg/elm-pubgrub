@@ -18,7 +18,7 @@ solve root version =
 
 solveRec : String -> String -> List Incompatibility -> PartialSolution -> Result String (List { name : String, version : Version })
 solveRec root package allIncompats partial =
-    case unitPropagation root (Debug.log "unitPropagation" package) allIncompats partial of
+    case unitPropagation root package allIncompats partial of
         Err msg ->
             Err msg
 
@@ -32,8 +32,8 @@ solveRec root package allIncompats partial =
                         Err "Is this possible???"
 
                 Just ( next, updatedAgainAllIncompats, updatedAgainPartial ) ->
-                    -- if PartialSolution.isSolution updatedPartial then
-                    solveRec root (Debug.log "Decision:" next) updatedAgainAllIncompats updatedAgainPartial
+                    -- if PartialSolution.isSolution updatedAgainPartial then
+                    solveRec root next updatedAgainAllIncompats updatedAgainPartial
 
 
 init : String -> Version -> Incompatibility
@@ -66,6 +66,7 @@ makeDecision listAvailableVersions allIncompats partial =
                 updatedAllIncompats =
                     List.foldr Incompatibility.merge allIncompats depIncompats
             in
+            -- TODO: Should we use updatedAllIncompats instead of depIncompats?
             case PartialSolution.canAddVersion name version depIncompats partial of
                 ( False, _ ) ->
                     Just ( name, updatedAllIncompats, partial )
@@ -219,7 +220,7 @@ unitPropagationLoop root package changed loopIncompatibilities allIncompats part
 -}
 conflictResolution : Bool -> String -> Incompatibility -> List Incompatibility -> PartialSolution -> Result String ( PartialSolution, Incompatibility, List Incompatibility )
 conflictResolution incompatChanged root incompat allIncompats partial =
-    if Dict.isEmpty (Debug.log "\nconflictResolution incompat" incompat) then
+    if Dict.isEmpty incompat then
         Err reportError
 
     else if Dict.size incompat == 1 then
@@ -274,11 +275,14 @@ continueResolution incompatChanged root incompat allIncompats partial =
             else
                 let
                     priorCause =
+                        -- "priorCause is guaranted to be almost satisfied by the partial solution"
                         Incompatibility.priorCause satisfier.name cause incompat
                 in
                 -- if satisfier does not satisfy term
                 if not (Term.satisfies term [ satisfier.term ]) then
                     -- add `not (satisfier \ term)` to priorCause. Then set incompat to priorCause
+                    -- satisfier \ term  ===  intersection satisfier (not term)
+                    -- not (...)  ===  union (not satisfier) (term)
                     let
                         derived =
                             Term.union term (Term.negate satisfier.term)
