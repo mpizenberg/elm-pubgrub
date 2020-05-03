@@ -153,7 +153,7 @@ and including that assignment plus satisfier.
 -}
 findPreviousSatisfier : Assignment -> Incompatibility -> PartialSolution -> Maybe ( Assignment, PartialSolution, Term )
 findPreviousSatisfier satisfier incompat earlierPartial =
-    Utils.find (searchSatisfier incompat (\ass early -> satisfier :: ass :: early)) earlierPartial
+    Utils.find (searchSatisfier incompat (\assign earlier -> satisfier :: assign :: earlier)) earlierPartial
 
 
 {-| A satisfier is the earliest assignment in partial solution such that the incompatibility
