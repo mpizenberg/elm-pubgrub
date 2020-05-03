@@ -90,6 +90,10 @@ prependDecision name term partial =
             [ Assignment.newDecision name term 0 ]
 
         { decisionLevel } :: _ ->
+            let
+                _ =
+                    Debug.log ("Decision level " ++ String.fromInt decisionLevel ++ " : " ++ name ++ " : " ++ Term.toDebugString term) ""
+            in
             Assignment.newDecision name term (decisionLevel + 1) :: partial
 
 
@@ -100,6 +104,10 @@ prependDerivation name term cause partial =
             [ Assignment.newDerivation name term 0 cause ]
 
         { decisionLevel } :: _ ->
+            let
+                _ =
+                    Debug.log ("Derivation : " ++ name ++ " : " ++ Term.toDebugString term) ""
+            in
             Assignment.newDerivation name term decisionLevel cause :: partial
 
 
@@ -134,6 +142,10 @@ dropUntilLevel level partial =
                 dropUntilLevel level others
 
             else
+                let
+                    _ =
+                        Debug.log ("Backtrack partial solution to:\n" ++ toDebugString partial) ""
+                in
                 partial
 
 

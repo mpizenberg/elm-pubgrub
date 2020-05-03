@@ -63,6 +63,13 @@ makeDecision listAvailableVersions allIncompats partial =
                 depIncompats =
                     Incompatibility.fromDependencies name version dependencies
 
+                _ =
+                    Debug.log "Add the following incompatibilities" ""
+
+                _ =
+                    depIncompats
+                        |> List.map (\i -> Debug.log ("  " ++ Incompatibility.toDebugString 0 i) "")
+
                 updatedAllIncompats =
                     List.foldr Incompatibility.merge allIncompats depIncompats
             in

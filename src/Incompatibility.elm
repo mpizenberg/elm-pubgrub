@@ -22,9 +22,9 @@ type Relation
 -- Debug
 
 
-toDebugString : Incompatibility -> String
-toDebugString incompat =
-    Json.Encode.encode 2 <|
+toDebugString : Int -> Incompatibility -> String
+toDebugString indentation incompat =
+    Json.Encode.encode indentation <|
         Json.Encode.dict
             identity
             (\term -> Json.Encode.string (Term.toDebugString term))
