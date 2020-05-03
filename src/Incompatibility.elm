@@ -135,8 +135,5 @@ relationStep set incompat relationAccum =
                         Satisfies ->
                             relationStep set otherIncompats (AlmostSatisfies name term)
 
-                        AlmostSatisfies _ _ ->
-                            relationStep set otherIncompats Inconclusive
-
                         _ ->
-                            relationAccum
+                            relationStep set otherIncompats Inconclusive
