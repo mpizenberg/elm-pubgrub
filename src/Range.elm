@@ -45,10 +45,10 @@ toDebugString range =
             "∗"
 
         Exact v ->
-            "v = " ++ Version.toDebugString v
+            Version.toDebugString v
 
         DifferentThan v ->
-            "v /= " ++ Version.toDebugString v
+            "/= " ++ Version.toDebugString v
 
         HigherThan v ->
             Version.toDebugString v ++ " <= v"
