@@ -54,7 +54,12 @@ finalDecision : Assignment -> Maybe { name : String, version : Version }
 finalDecision { name, term, kind } =
     case ( kind, term ) of
         ( Decision, Term.Positive range ) ->
-            Just { name = name, version = Maybe.withDefault Version.one (Range.getExactVersion range) }
+            case Range.getExactVersion range of
+                Just version ->
+                    Just { name = name, version = version }
+
+                Nothing ->
+                    Debug.todo "Should not be possible to have a decision without an exact version"
 
         _ ->
             Nothing

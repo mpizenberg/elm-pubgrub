@@ -1,4 +1,4 @@
-module Version exposing (Version, bumpMajor, bumpMinor, bumpPatch, equals, fromTuple, higherThan, lowerThan, max, min, new, new_, one, three, toDebugString, toTuple, two)
+module Version exposing (Version, bumpMajor, bumpMinor, bumpPatch, fromTuple, higherThan, lowerThan, max, min, new, new_, one, three, toDebugString, toTuple, two, zero)
 
 
 type Version
@@ -22,6 +22,11 @@ toDebugString (Version { major, minor, patch }) =
 
 
 -- Constructor
+
+
+zero : Version
+zero =
+    Version { major = 0, minor = 0, patch = 0 }
 
 
 one : Version
@@ -92,13 +97,6 @@ toTuple (Version { major, minor, patch }) =
 
 
 -- Comparisons
-
-
-equals : Version -> Version -> Bool
-equals (Version v1) (Version v2) =
-    (v1.major == v2.major)
-        && (v1.minor == v2.minor)
-        && (v1.patch == v2.patch)
 
 
 higherThan : Version -> Version -> Bool

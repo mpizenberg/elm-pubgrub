@@ -62,10 +62,10 @@ relation term set =
         fullIntersection =
             intersection term setIntersection
     in
-    if equals setIntersection fullIntersection then
+    if setIntersection == fullIntersection then
         Satisfies
 
-    else if equals (Positive Range.none) fullIntersection then
+    else if Positive Range.none == fullIntersection then
         Contradicts
 
     else
@@ -83,8 +83,7 @@ listIntersection initial terms =
 contradicts : Term -> List Term -> Bool
 contradicts term set =
     -- Not sure about the behavior for the empty list ...
-    listIntersection (Just term) set
-        |> equals (Positive Range.none)
+    listIntersection (Just term) set == Positive Range.none
 
 
 satisfies : Term -> List Term -> Bool
@@ -95,20 +94,7 @@ satisfies term set =
 
 subsetOf : Term -> Term -> Bool
 subsetOf t1 t2 =
-    equals t2 (intersection t1 t2)
-
-
-equals : Term -> Term -> Bool
-equals t1 t2 =
-    case ( t1, t2 ) of
-        ( Positive r1, Positive r2 ) ->
-            Range.equals r1 r2
-
-        ( Negative r1, Negative r2 ) ->
-            Range.equals r1 r2
-
-        _ ->
-            False
+    t2 == intersection t1 t2
 
 
 intersection : Term -> Term -> Term
@@ -160,7 +146,7 @@ acceptVersionJust : Version -> Term -> Bool
 acceptVersionJust version term =
     case term of
         Positive range ->
-            Range.acceptVersion version range
+            Range.contains version range
 
         Negative range ->
-            Range.acceptVersion version (Range.negate range)
+            Range.contains version (Range.negate range)
