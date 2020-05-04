@@ -3,6 +3,8 @@ module Utils exposing (SearchDecision(..), find)
 import Pivot exposing (Pivot)
 
 
+{-| Custom type for a generic searching algorithm over a list zipper.
+-}
 type SearchDecision b
     = GoLeft Int
       -- search left but do not discard current position
@@ -14,6 +16,15 @@ type SearchDecision b
     | Found b
 
 
+{-| Fast and customizable searching algorithm on lists, based on a list zipper.
+The stepping search function takes as argument the bounds of searchable values,
+as well as the current value evaluated and all the rest of the right list
+(even after the right bound).
+
+This enables efficient search algorithms that need access to all the rest of the list
+such as the one looking for the "satisfier" assignment of a partial solution.
+
+-}
 find : ({ left : Int, right : Int } -> a -> List a -> SearchDecision b) -> List a -> Maybe b
 find search list =
     case list of
@@ -24,6 +35,14 @@ find search list =
             findHelper search { left = 0, right = List.length xs } (Pivot.fromCons x xs)
 
 
+{-| Move over the Zipper in a given direction
+and update accordingly the right and left limits.
+
+In case of KeepGoLeft or KeepGoRight,
+keep the current cursor in bounds for the next step,
+otherwise it is discarded.
+
+-}
 findHelper :
     ({ left : Int, right : Int } -> a -> List a -> SearchDecision b)
     -> { left : Int, right : Int }
