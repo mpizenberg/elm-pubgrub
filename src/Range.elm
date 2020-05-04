@@ -347,16 +347,6 @@ to avoid infinite loops.
 -}
 reduceIntersection : Range -> Range -> Range
 reduceIntersection r1 r2 =
-    -- intersection r1 r2
-    --
-    -- TODO: is this gonna loop indefinitely?
-    -- YES!
-    -- Example 3 triggers a maximum call stack exception.
-    -- So it loops indefinitely and furthermore,
-    -- the "intersection" function is not tail call optimized.
-    --
-    -- Maybe we should copy the intersection function but just replace "reduceIntersection"
-    -- and "reduceUnion" by "Intersection" and "Union"?
     case ( r1, r2 ) of
         ( None, _ ) ->
             None
