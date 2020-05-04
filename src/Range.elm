@@ -3,6 +3,17 @@ module Range exposing (Range(..), acceptVersion, equals, intersection, negate, t
 import Version exposing (Version)
 
 
+{-| Custom type to try expressing most ranges of versions expressions
+that may occur during the PubGrub algorithm,
+in the most efficient way possible for fast transformations.
+
+The complement of a range for example (`negate` function)
+is efficiently expressed just with the opposite variant.
+
+The `Intersection` and `Union` variants are last resort escape hatches for when
+a set of versions cannot be expressed directly with another range primitive.
+
+-}
 type Range
     = None
     | Any
@@ -62,6 +73,10 @@ toDebugString range =
 -- Functions
 
 
+{-| Check if two ranges are equivalent.
+Due to the `Intersection` and `Union` variants possibly being in non reduced forms,
+this might fail in identifying equivalent ranges as such.
+-}
 equals : Range -> Range -> Bool
 equals r1 r2 =
     case ( r1, r2 ) of
@@ -120,11 +135,18 @@ normalizedBetween v1 v2 =
         None
 
 
+{-| Compute the union of two ranges.
+Implementation based on the intersection of two ranges.
+-}
 union : Range -> Range -> Range
 union r1 r2 =
     negate (intersection (negate r1) (negate r2))
 
 
+{-| Compute the intersection of two ranges.
+Use the `Intersection` or `Union` variants only as last resorts.
+Try reducing the union into one of the simplest primitives.
+-}
 intersection : Range -> Range -> Range
 intersection r1 r2 =
     case ( r1, r2 ) of
@@ -279,6 +301,9 @@ intersection r1 r2 =
             intersection r2 r1
 
 
+{-| Used internally instead of the `intersection` function for a recursive call
+to avoid infinite loops.
+-}
 reduceIntersection : Range -> Range -> Range
 reduceIntersection r1 r2 =
     -- intersection r1 r2
@@ -448,6 +473,9 @@ reduceUnion r1 r2 =
     negate (reduceIntersection (negate r1) (negate r2))
 
 
+{-| Get the complementary set of values for a given range.
+This avoids computations thanks to the variants used in the custom `Range` type.
+-}
 negate : Range -> Range
 negate range =
     case range of
@@ -482,6 +510,8 @@ negate range =
             Intersection (negate r1) (negate r2)
 
 
+{-| Check if a version is inside the set described by a given range.
+-}
 acceptVersion : Version -> Range -> Bool
 acceptVersion version range =
     case range of
