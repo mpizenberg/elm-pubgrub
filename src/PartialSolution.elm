@@ -63,7 +63,7 @@ canAddVersion : String -> Version -> List Incompatibility -> PartialSolution -> 
 canAddVersion name version newIncompatibilities partial =
     let
         updatedPartial =
-            prependDecision name (Term.Positive (Range.Exact version)) partial
+            prependDecision name (Term.Positive (Range.exact version)) partial
     in
     ( doesNotSatisfy newIncompatibilities (toDict updatedPartial), updatedPartial )
 

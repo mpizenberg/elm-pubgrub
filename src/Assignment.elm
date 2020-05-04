@@ -53,8 +53,8 @@ kindToString kind =
 finalDecision : Assignment -> Maybe { name : String, version : Version }
 finalDecision { name, term, kind } =
     case ( kind, term ) of
-        ( Decision, Term.Positive (Range.Exact version) ) ->
-            Just { name = name, version = version }
+        ( Decision, Term.Positive range ) ->
+            Just { name = name, version = Maybe.withDefault Version.one (Range.getExactVersion range) }
 
         _ ->
             Nothing

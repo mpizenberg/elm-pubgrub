@@ -65,7 +65,7 @@ relation term set =
     if equals setIntersection fullIntersection then
         Satisfies
 
-    else if equals (Positive Range.None) fullIntersection then
+    else if equals (Positive Range.none) fullIntersection then
         Contradicts
 
     else
@@ -77,14 +77,14 @@ and let the caller decide what should be the default if Nothing.
 -}
 listIntersection : Maybe Term -> List Term -> Term
 listIntersection initial terms =
-    List.foldl intersection (Maybe.withDefault (Negative Range.None) initial) terms
+    List.foldl intersection (Maybe.withDefault (Negative Range.none) initial) terms
 
 
 contradicts : Term -> List Term -> Bool
 contradicts term set =
     -- Not sure about the behavior for the empty list ...
     listIntersection (Just term) set
-        |> equals (Positive Range.None)
+        |> equals (Positive Range.none)
 
 
 satisfies : Term -> List Term -> Bool

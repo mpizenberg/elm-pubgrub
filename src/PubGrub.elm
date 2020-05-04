@@ -38,7 +38,7 @@ solveRec root package allIncompats partial =
 
 init : String -> Version -> Incompatibility
 init root version =
-    Dict.singleton root (Term.Negative (Range.Exact version))
+    Dict.singleton root (Term.Negative (Range.exact version))
 
 
 makeDecision : (String -> List Version) -> List Incompatibility -> PartialSolution -> Maybe ( String, List Incompatibility, PartialSolution )

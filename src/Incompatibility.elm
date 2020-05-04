@@ -41,7 +41,7 @@ fromDependencies : String -> Version -> List ( String, Range ) -> List Incompati
 fromDependencies package version dependencies =
     let
         baseIncompat =
-            Dict.singleton package (Term.Positive (Range.Exact version))
+            Dict.singleton package (Term.Positive (Range.exact version))
 
         addIncompat ( name, range ) accumIncompats =
             Dict.insert name (Term.Negative range) baseIncompat :: accumIncompats

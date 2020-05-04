@@ -22,10 +22,10 @@ listAvailableVersions =
 getDependencies1 package version =
     case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
-            Just [ ( "foo", Range.Between Version.one Version.two ) ]
+            Just [ ( "foo", Range.between Version.one Version.two ) ]
 
         ( "foo", ( 1, 0, 0 ) ) ->
-            Just [ ( "bar", Range.Between Version.one Version.two ) ]
+            Just [ ( "bar", Range.between Version.one Version.two ) ]
 
         ( "bar", ( 1, 0, 0 ) ) ->
             Just []
@@ -78,12 +78,12 @@ getDependencies2 package version =
     case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
             Just
-                [ ( "foo", Range.Between Version.one Version.two )
-                , ( "bar", Range.Between Version.one Version.two )
+                [ ( "foo", Range.between Version.one Version.two )
+                , ( "bar", Range.between Version.one Version.two )
                 ]
 
         ( "foo", ( 1, 1, 0 ) ) ->
-            Just [ ( "bar", Range.Between Version.two Version.three ) ]
+            Just [ ( "bar", Range.between Version.two Version.three ) ]
 
         ( "foo", ( 1, 0, 0 ) ) ->
             Just []
@@ -125,16 +125,16 @@ listAvailableVersions3 package =
 getDependencies3 package version =
     case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
-            Just [ ( "foo", Range.HigherThan Version.one ) ]
+            Just [ ( "foo", Range.higherThan Version.one ) ]
 
         ( "foo", ( 2, 0, 0 ) ) ->
-            Just [ ( "bar", Range.Between Version.one Version.two ) ]
+            Just [ ( "bar", Range.between Version.one Version.two ) ]
 
         ( "foo", ( 1, 0, 0 ) ) ->
             Just []
 
         ( "bar", ( 1, 0, 0 ) ) ->
-            Just [ ( "foo", Range.Between Version.one Version.two ) ]
+            Just [ ( "foo", Range.between Version.one Version.two ) ]
 
         _ ->
             Nothing
@@ -174,30 +174,30 @@ getDependencies4 package version =
     case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
             Just
-                [ ( "foo", Range.Between Version.one Version.two )
-                , ( "target", Range.Between Version.two Version.three )
+                [ ( "foo", Range.between Version.one Version.two )
+                , ( "target", Range.between Version.two Version.three )
                 ]
 
         ( "foo", ( 1, 1, 0 ) ) ->
             Just
-                [ ( "left", Range.Between Version.one Version.two )
-                , ( "right", Range.Between Version.one Version.two )
+                [ ( "left", Range.between Version.one Version.two )
+                , ( "right", Range.between Version.one Version.two )
                 ]
 
         ( "foo", ( 1, 0, 0 ) ) ->
             Just []
 
         ( "left", ( 1, 0, 0 ) ) ->
-            Just [ ( "shared", Range.HigherThan Version.one ) ]
+            Just [ ( "shared", Range.higherThan Version.one ) ]
 
         ( "right", ( 1, 0, 0 ) ) ->
-            Just [ ( "shared", Range.LowerThan Version.two ) ]
+            Just [ ( "shared", Range.lowerThan Version.two ) ]
 
         ( "shared", ( 2, 0, 0 ) ) ->
             Just []
 
         ( "shared", ( 1, 0, 0 ) ) ->
-            Just [ ( "target", Range.Between Version.one Version.two ) ]
+            Just [ ( "target", Range.between Version.one Version.two ) ]
 
         ( "target", ( 2, 0, 0 ) ) ->
             Just []

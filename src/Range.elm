@@ -1,4 +1,4 @@
-module Range exposing (Range(..), acceptVersion, equals, intersection, negate, toDebugString, union)
+module Range exposing (Range, acceptVersion, between, equals, exact, getExactVersion, higherThan, intersection, lowerThan, negate, none, toDebugString, union)
 
 import Version exposing (Version)
 
@@ -29,6 +29,49 @@ type Range
       -- Added because otherwise example 2 cannot be solved
     | Intersection Range Range
     | Union Range Range
+
+
+
+-- Constructors
+
+
+none : Range
+none =
+    None
+
+
+exact : Version -> Range
+exact =
+    Exact
+
+
+higherThan : Version -> Range
+higherThan =
+    HigherThan
+
+
+lowerThan : Version -> Range
+lowerThan =
+    LowerThan
+
+
+between : Version -> Version -> Range
+between =
+    Between
+
+
+
+-- Extract exact version
+
+
+getExactVersion : Range -> Maybe Version
+getExactVersion range =
+    case range of
+        Exact version ->
+            Just version
+
+        _ ->
+            Nothing
 
 
 
