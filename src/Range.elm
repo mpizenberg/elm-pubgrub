@@ -105,22 +105,20 @@ equals r1 r2 =
             Version.equals v1 v3 && Version.equals v2 v4
 
         -- This might not be totally right?
-        ( Intersection r11 r12, Intersection r21 r22 ) ->
-            (equals r11 r21 && equals r12 r22)
-                || (equals r11 r22 && equals r12 r21)
+        ( Intersection _ _, Intersection _ _ ) ->
+            Debug.todo "Implement this in a correct way 'most of the time'"
 
         -- This might not be totally right?
-        ( Union r11 r12, Union r21 r22 ) ->
-            (equals r11 r21 && equals r12 r22)
-                || (equals r11 r22 && equals r12 r21)
+        ( Union _ _, Union _ _ ) ->
+            Debug.todo "Implement this in a correct way 'most of the time'"
 
         -- This might not be totally right?
         ( Intersection _ _, Union _ _ ) ->
-            equals r1 (negate r2)
+            Debug.todo "Implement this in a correct way 'most of the time'"
 
         -- This might not be totally right?
         ( Union _ _, Intersection _ _ ) ->
-            equals r1 (negate r2)
+            Debug.todo "Implement this in a correct way 'most of the time'"
 
         _ ->
             False
