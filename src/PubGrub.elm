@@ -20,7 +20,7 @@ type alias Model =
 init : String -> Version -> Model
 init root version =
     { incompatibilities = [ Incompatibility.fromTerm root (Term.Negative (Range.exact version)) ]
-    , partialSolution = []
+    , partialSolution = PartialSolution.empty
     }
 
 
@@ -71,7 +71,7 @@ solveRec root package model =
             case makeDecision Stub.listAvailableVersions updatedModel of
                 Nothing ->
                     if PartialSolution.isSolution updatedModel.partialSolution then
-                        Ok (List.filterMap Assignment.finalDecision updatedModel.partialSolution)
+                        Ok (PartialSolution.toSolution updatedModel.partialSolution)
 
                     else
                         Err "Is this possible???"

@@ -1,4 +1,4 @@
-module PartialSolution exposing (PartialSolution, canAddVersion, dropUntilLevel, encode, findPreviousSatisfier, findSatisfier, isSolution, prependDecision, prependDerivation, splitDecisions, toDebugString, toDict)
+module PartialSolution exposing (PartialSolution, canAddVersion, dropUntilLevel, empty, encode, findPreviousSatisfier, findSatisfier, isSolution, prependDecision, prependDerivation, splitDecisions, toDebugString, toDict, toSolution)
 
 import Assignment exposing (Assignment)
 import Dict exposing (Dict)
@@ -16,8 +16,13 @@ are quite useful for some parts of the pubgrub algorithm.
 Maybe a custom opaque type with both forms would provide performance benefits.
 This could be fun to benchmark :)
 -}
-type alias PartialSolution =
-    List Assignment
+type PartialSolution
+    = PartialSolution (List Assignment)
+
+
+empty : PartialSolution
+empty =
+    PartialSolution []
 
 
 
@@ -30,7 +35,7 @@ toDebugString partial =
 
 
 encode : PartialSolution -> Value
-encode partial =
+encode (PartialSolution partial) =
     Json.Encode.list Assignment.encodeDebug partial
 
 
@@ -39,7 +44,7 @@ encode partial =
 
 
 splitDecisions : PartialSolution -> ( Set String, Dict String (List Term) ) -> ( Set String, Dict String (List Term) )
-splitDecisions partial ( decisions, derivations ) =
+splitDecisions (PartialSolution partial) ( decisions, derivations ) =
     case partial of
         [] ->
             ( decisions, derivations )
@@ -47,10 +52,10 @@ splitDecisions partial ( decisions, derivations ) =
         assignment :: others ->
             case assignment.kind of
                 Assignment.Decision _ ->
-                    splitDecisions others ( Set.insert assignment.name decisions, derivations )
+                    splitDecisions (PartialSolution others) ( Set.insert assignment.name decisions, derivations )
 
                 Assignment.Derivation term _ ->
-                    splitDecisions others ( decisions, Dict.update assignment.name (Just << (::) term << Maybe.withDefault []) derivations )
+                    splitDecisions (PartialSolution others) ( decisions, Dict.update assignment.name (Just << (::) term << Maybe.withDefault []) derivations )
 
 
 {-| We can add the version to the partial solution as a decision
@@ -84,35 +89,35 @@ doesNotSatisfy newIncompatibilities partial =
 
 
 prependDecision : String -> Version -> PartialSolution -> PartialSolution
-prependDecision name version partial =
+prependDecision name version (PartialSolution partial) =
     case partial of
         [] ->
-            [ Assignment.newDecision name version 0 ]
+            PartialSolution [ Assignment.newDecision name version 0 ]
 
         { decisionLevel } :: _ ->
             let
                 _ =
                     Debug.log ("Decision level " ++ String.fromInt decisionLevel ++ " : " ++ name ++ " : " ++ Version.toDebugString version) ""
             in
-            Assignment.newDecision name version (decisionLevel + 1) :: partial
+            PartialSolution (Assignment.newDecision name version (decisionLevel + 1) :: partial)
 
 
 prependDerivation : String -> Term -> Incompatibility -> PartialSolution -> PartialSolution
-prependDerivation name term cause partial =
+prependDerivation name term cause (PartialSolution partial) =
     case partial of
         [] ->
-            [ Assignment.newDerivation name term 0 cause ]
+            PartialSolution [ Assignment.newDerivation name term 0 cause ]
 
         { decisionLevel } :: _ ->
             let
                 _ =
                     Debug.log ("Derivation : " ++ name ++ " : " ++ Term.toDebugString term) ""
             in
-            Assignment.newDerivation name term decisionLevel cause :: partial
+            PartialSolution (Assignment.newDerivation name term decisionLevel cause :: partial)
 
 
 toDict : PartialSolution -> Dict String (List Term)
-toDict partial =
+toDict (PartialSolution partial) =
     List.foldr addAssignment Dict.empty partial
 
 
@@ -132,26 +137,26 @@ addTerm assignment maybeTerms =
 
 
 dropUntilLevel : Int -> PartialSolution -> PartialSolution
-dropUntilLevel level partial =
+dropUntilLevel level ((PartialSolution partial) as ps) =
     case partial of
         [] ->
-            []
+            PartialSolution []
 
         assignment :: others ->
             if assignment.decisionLevel > level then
-                dropUntilLevel level others
+                dropUntilLevel level (PartialSolution others)
 
             else
                 let
                     _ =
-                        Debug.log ("Backtrack partial solution to:\n" ++ toDebugString partial) ""
+                        Debug.log ("Backtrack partial solution to:\n" ++ toDebugString ps) ""
                 in
-                partial
+                ps
 
 
 findSatisfier : Incompatibility -> PartialSolution -> ( Assignment, PartialSolution, Term )
-findSatisfier incompat partial =
-    case Utils.find (searchSatisfier incompat (::)) partial of
+findSatisfier incompat (PartialSolution partial) =
+    case Utils.find (searchSatisfier incompat (\assign earlier -> PartialSolution (assign :: earlier))) partial of
         Just x ->
             x
 
@@ -164,8 +169,8 @@ such that incompatibility is satisfied by the partial solution up to
 and including that assignment plus satisfier.
 -}
 findPreviousSatisfier : Assignment -> Incompatibility -> PartialSolution -> Maybe ( Assignment, PartialSolution, Term )
-findPreviousSatisfier satisfier incompat earlierPartial =
-    Utils.find (searchSatisfier incompat (\assign earlier -> satisfier :: assign :: earlier)) earlierPartial
+findPreviousSatisfier satisfier incompat (PartialSolution earlierPartial) =
+    Utils.find (searchSatisfier incompat (\assign earlier -> PartialSolution (satisfier :: assign :: earlier))) earlierPartial
 
 
 {-| A satisfier is the earliest assignment in partial solution such that the incompatibility
@@ -187,7 +192,7 @@ searchSatisfier incompat buildPartial { left, right } assignment earlierAssignme
                     Just term ->
                         Found
                             ( assignment
-                            , earlierAssignments
+                            , PartialSolution earlierAssignments
                             , term
                             )
 
@@ -206,16 +211,25 @@ searchSatisfier incompat buildPartial { left, right } assignment earlierAssignme
                 GoLeft (max 1 (left // 2))
 
 
+
+-- Final solution
+
+
+toSolution : PartialSolution -> List { name : String, version : Version }
+toSolution (PartialSolution partial) =
+    List.filterMap Assignment.finalDecision partial
+
+
 {-| If a partial solution has, for every positive derivation,
 a corresponding decision that satisfies that assignment,
 it's a total solution and version solving has succeeded.
 -}
 isSolution : PartialSolution -> Bool
-isSolution partial =
+isSolution (PartialSolution partial) =
     isSolutionRec (List.reverse partial) True
 
 
-isSolutionRec : PartialSolution -> Bool -> Bool
+isSolutionRec : List Assignment -> Bool -> Bool
 isSolutionRec partial precondition =
     case ( precondition, partial ) of
         ( False, _ ) ->
@@ -238,7 +252,7 @@ isSolutionRec partial precondition =
                             isSolutionRec others (Term.satisfies term (getDecision assignment.name others))
 
 
-getDecision : String -> PartialSolution -> List Term
+getDecision : String -> List Assignment -> List Term
 getDecision searchedName partial =
     case partial of
         [] ->
