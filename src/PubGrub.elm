@@ -267,21 +267,8 @@ unitPropagationLoop root package changed loopIncompatibilities model =
 -}
 conflictResolution : Bool -> String -> Incompatibility -> Model -> Result String ( Incompatibility, Model )
 conflictResolution incompatChanged root incompat model =
-    if Dict.isEmpty incompat then
+    if Dict.isEmpty incompat || Incompatibility.singlePositive root incompat then
         Err reportError
-
-    else if Dict.size incompat == 1 then
-        case Dict.toList incompat of
-            ( name, Term.Positive _ ) :: [] ->
-                if name == root then
-                    Err reportError
-
-                else
-                    -- TODO: tail rec
-                    continueResolution incompatChanged root incompat model
-
-            _ ->
-                continueResolution incompatChanged root incompat model
 
     else
         -- TODO: tail rec

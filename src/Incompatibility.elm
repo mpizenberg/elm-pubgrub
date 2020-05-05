@@ -1,4 +1,4 @@
-module Incompatibility exposing (Incompatibility, Relation(..), fromDependencies, merge, priorCause, relation, termUnion, toDebugString)
+module Incompatibility exposing (Incompatibility, Relation(..), fromDependencies, merge, priorCause, relation, singlePositive, termUnion, toDebugString)
 
 import Dict exposing (Dict)
 import Json.Encode
@@ -33,6 +33,20 @@ toDebugString indentation incompat =
 
 
 -- Functions
+
+
+singlePositive : String -> Incompatibility -> Bool
+singlePositive package incompat =
+    if Dict.size incompat == 1 then
+        case Dict.get package incompat of
+            Just (Term.Positive _) ->
+                True
+
+            _ ->
+                False
+
+    else
+        False
 
 
 {-| Generate a list of incompatibilities from direct dependencies of a package.
