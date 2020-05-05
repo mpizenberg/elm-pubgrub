@@ -11,44 +11,83 @@ import Term exposing (Term)
 import Version exposing (Version)
 
 
+type alias Model =
+    { incompatibilities : List Incompatibility
+    , partialSolution : PartialSolution
+    }
+
+
+init : String -> Version -> Model
+init root version =
+    { incompatibilities = [ Dict.singleton root (Term.Negative (Range.exact version)) ]
+    , partialSolution = []
+    }
+
+
+setIncompatibilities : List Incompatibility -> Model -> Model
+setIncompatibilities incompatibilities model =
+    { incompatibilities = incompatibilities
+    , partialSolution = model.partialSolution
+    }
+
+
+setPartialSolution : PartialSolution -> Model -> Model
+setPartialSolution partialSolution model =
+    { incompatibilities = model.incompatibilities
+    , partialSolution = partialSolution
+    }
+
+
+updateIncompatibilities : (List Incompatibility -> List Incompatibility) -> Model -> Model
+updateIncompatibilities f { incompatibilities, partialSolution } =
+    { incompatibilities = f incompatibilities
+    , partialSolution = partialSolution
+    }
+
+
+updatePartialSolution : (PartialSolution -> PartialSolution) -> Model -> Model
+updatePartialSolution f { incompatibilities, partialSolution } =
+    { incompatibilities = incompatibilities
+    , partialSolution = f partialSolution
+    }
+
+
+
+-- PubGrub algorithm
+
+
 solve : String -> Version -> Result String (List { name : String, version : Version })
 solve root version =
-    solveRec root root [ init root version ] []
+    solveRec root root (init root version)
 
 
-solveRec : String -> String -> List Incompatibility -> PartialSolution -> Result String (List { name : String, version : Version })
-solveRec root package allIncompats partial =
-    case unitPropagation root package allIncompats partial of
+solveRec : String -> String -> Model -> Result String (List { name : String, version : Version })
+solveRec root package model =
+    case unitPropagation root package model of
         Err msg ->
             Err msg
 
-        Ok ( updatedPartial, updatedAllIncompats ) ->
-            case makeDecision Stub.listAvailableVersions updatedAllIncompats updatedPartial of
+        Ok updatedModel ->
+            case makeDecision Stub.listAvailableVersions updatedModel of
                 Nothing ->
-                    if PartialSolution.isSolution updatedPartial then
-                        Ok (List.filterMap Assignment.finalDecision updatedPartial)
+                    if PartialSolution.isSolution updatedModel.partialSolution then
+                        Ok (List.filterMap Assignment.finalDecision updatedModel.partialSolution)
 
                     else
                         Err "Is this possible???"
 
-                Just ( next, updatedAgainAllIncompats, updatedAgainPartial ) ->
-                    -- if PartialSolution.isSolution updatedAgainPartial then
-                    solveRec root next updatedAgainAllIncompats updatedAgainPartial
+                Just ( next, updatedAgainModel ) ->
+                    solveRec root next updatedAgainModel
 
 
-init : String -> Version -> Incompatibility
-init root version =
-    Dict.singleton root (Term.Negative (Range.exact version))
-
-
-makeDecision : (String -> List Version) -> List Incompatibility -> PartialSolution -> Maybe ( String, List Incompatibility, PartialSolution )
-makeDecision listAvailableVersions allIncompats partial =
-    case pickPackageVersion partial listAvailableVersions of
+makeDecision : (String -> List Version) -> Model -> Maybe ( String, Model )
+makeDecision listAvailableVersions model =
+    case pickPackageVersion model.partialSolution listAvailableVersions of
         Nothing ->
             Nothing
 
         Just (Err ( name, incompat )) ->
-            Just ( name, Incompatibility.merge incompat allIncompats, partial )
+            Just ( name, updateIncompatibilities (Incompatibility.merge incompat) model )
 
         Just (Ok ( name, version )) ->
             let
@@ -70,16 +109,15 @@ makeDecision listAvailableVersions allIncompats partial =
                     depIncompats
                         |> List.map (\i -> Debug.log ("  " ++ Incompatibility.toDebugString 0 i) "")
 
-                updatedAllIncompats =
-                    List.foldr Incompatibility.merge allIncompats depIncompats
+                updatedIncompatibilities =
+                    List.foldr Incompatibility.merge model.incompatibilities depIncompats
             in
-            -- TODO: Should we use updatedAllIncompats instead of depIncompats?
-            case PartialSolution.canAddVersion name version depIncompats partial of
+            case PartialSolution.canAddVersion name version depIncompats model.partialSolution of
                 ( False, _ ) ->
-                    Just ( name, updatedAllIncompats, partial )
+                    Just ( name, setIncompatibilities updatedIncompatibilities model )
 
                 ( True, updatedPartial ) ->
-                    Just ( name, updatedAllIncompats, updatedPartial )
+                    Just ( name, Model updatedIncompatibilities updatedPartial )
 
 
 {-| Heuristic to pick the next package & version to add to the partial solution.
@@ -169,64 +207,66 @@ getDependencies package version =
     Debug.todo "Should be implemented lazily"
 
 
-unitPropagation : String -> String -> List Incompatibility -> PartialSolution -> Result String ( PartialSolution, List Incompatibility )
-unitPropagation root package incompatibilities partial =
-    unitPropagationLoop root "" [ package ] [] incompatibilities partial
+unitPropagation : String -> String -> Model -> Result String Model
+unitPropagation root package model =
+    unitPropagationLoop root "" [ package ] [] model
 
 
-unitPropagationLoop : String -> String -> List String -> List Incompatibility -> List Incompatibility -> PartialSolution -> Result String ( PartialSolution, List Incompatibility )
-unitPropagationLoop root package changed loopIncompatibilities allIncompats partial =
+unitPropagationLoop : String -> String -> List String -> List Incompatibility -> Model -> Result String Model
+unitPropagationLoop root package changed loopIncompatibilities model =
     case loopIncompatibilities of
         [] ->
             case changed of
                 [] ->
-                    Ok ( partial, allIncompats )
+                    Ok model
 
                 pack :: othersChanged ->
-                    unitPropagationLoop root pack othersChanged allIncompats allIncompats partial
+                    unitPropagationLoop root pack othersChanged model.incompatibilities model
 
         incompat :: othersIncompat ->
             if Dict.member package incompat then
-                case Incompatibility.relation incompat (PartialSolution.toDict partial) of
+                case Incompatibility.relation incompat (PartialSolution.toDict model.partialSolution) of
                     Incompatibility.Satisfies ->
-                        case conflictResolution False root incompat allIncompats partial of
+                        case conflictResolution False root incompat model of
                             Err msg ->
                                 Err msg
 
-                            Ok ( updatedPartial, priorCause, updatedAllIncompats ) ->
+                            Ok ( priorCause, updatedModel ) ->
                                 -- priorCause is guaranted to be almost satisfied by the partial solution
-                                case Incompatibility.relation priorCause (PartialSolution.toDict updatedPartial) of
+                                case Incompatibility.relation priorCause (PartialSolution.toDict updatedModel.partialSolution) of
                                     Incompatibility.AlmostSatisfies name term ->
                                         let
-                                            -- add not term to partial with incompat as cause
-                                            partialWithNotTermInPriorCause =
-                                                PartialSolution.prependDerivation name (Term.negate term) priorCause updatedPartial
+                                            -- add (not term) to partial solution with incompat as cause
+                                            updatedAgainModel =
+                                                updatePartialSolution (PartialSolution.prependDerivation name (Term.negate term) priorCause) updatedModel
                                         in
                                         -- Replace changed with a set containing only term's package name.
-                                        unitPropagationLoop root package [ name ] othersIncompat updatedAllIncompats partialWithNotTermInPriorCause
+                                        -- Would love to use the |> syntax if it would not break tail call optimization (TCO).
+                                        unitPropagationLoop root package [ name ] othersIncompat updatedAgainModel
 
                                     _ ->
                                         Err "This should never happen, priorCause is guaranted to be almost satisfied by the partial solution"
 
                     Incompatibility.AlmostSatisfies name term ->
                         let
-                            updatedPartial =
+                            updatedModel =
                                 -- derivation :: partial
-                                PartialSolution.prependDerivation name (Term.negate term) incompat partial
+                                updatePartialSolution (PartialSolution.prependDerivation name (Term.negate term) incompat) model
                         in
-                        unitPropagationLoop root package (name :: changed) othersIncompat allIncompats updatedPartial
+                        -- Would love to use the |> syntax if it didn't break TCO.
+                        unitPropagationLoop root package (name :: changed) othersIncompat updatedModel
 
                     _ ->
-                        unitPropagationLoop root package changed othersIncompat allIncompats partial
+                        unitPropagationLoop root package changed othersIncompat model
 
             else
-                unitPropagationLoop root package changed othersIncompat allIncompats partial
+                unitPropagationLoop root package changed othersIncompat model
 
 
-{-| Returns ( updated partial solution, prior cause, updated list of incompatibilities )
+{-| Return prior cause and the updated model.
 -}
-conflictResolution : Bool -> String -> Incompatibility -> List Incompatibility -> PartialSolution -> Result String ( PartialSolution, Incompatibility, List Incompatibility )
-conflictResolution incompatChanged root incompat allIncompats partial =
+conflictResolution : Bool -> String -> Incompatibility -> Model -> Result String ( Incompatibility, Model )
+conflictResolution incompatChanged root incompat model =
     if Dict.isEmpty incompat then
         Err reportError
 
@@ -238,14 +278,14 @@ conflictResolution incompatChanged root incompat allIncompats partial =
 
                 else
                     -- TODO: tail rec
-                    continueResolution incompatChanged root incompat allIncompats partial
+                    continueResolution incompatChanged root incompat model
 
             _ ->
-                continueResolution incompatChanged root incompat allIncompats partial
+                continueResolution incompatChanged root incompat model
 
     else
         -- TODO: tail rec
-        continueResolution incompatChanged root incompat allIncompats partial
+        continueResolution incompatChanged root incompat model
 
 
 reportError : String
@@ -253,11 +293,11 @@ reportError =
     "The root package can't be selected, version solving has failed"
 
 
-continueResolution : Bool -> String -> Incompatibility -> List Incompatibility -> PartialSolution -> Result String ( PartialSolution, Incompatibility, List Incompatibility )
-continueResolution incompatChanged root incompat allIncompats partial =
+continueResolution : Bool -> String -> Incompatibility -> Model -> Result String ( Incompatibility, Model )
+continueResolution incompatChanged root incompat model =
     let
         ( satisfier, earlierPartial, term ) =
-            PartialSolution.findSatisfier incompat partial
+            PartialSolution.findSatisfier incompat model.partialSolution
 
         maybePreviousSatisfier =
             PartialSolution.findPreviousSatisfier satisfier incompat earlierPartial
@@ -273,11 +313,11 @@ continueResolution incompatChanged root incompat allIncompats partial =
     case satisfier.kind of
         -- if satisfier.kind == Assignment.Decision || previousSatisfierLevel /= satisfier.decisionLevel then
         Assignment.Decision ->
-            Ok (updateAllIncompatsHelper incompatChanged previousSatisfierLevel incompat allIncompats partial)
+            Ok (backtrack incompatChanged previousSatisfierLevel incompat model)
 
         Assignment.Derivation { cause } ->
             if previousSatisfierLevel /= satisfier.decisionLevel then
-                Ok (updateAllIncompatsHelper incompatChanged previousSatisfierLevel incompat allIncompats partial)
+                Ok (backtrack incompatChanged previousSatisfierLevel incompat model)
 
             else
                 let
@@ -299,21 +339,23 @@ continueResolution incompatChanged root incompat allIncompats partial =
                     in
                     -- set incompat to newIncompat
                     -- TODO: tail rec
-                    conflictResolution True root newIncompat allIncompats partial
+                    conflictResolution True root newIncompat model
 
                 else
                     -- set incompat to priorCause
                     -- TODO: tail rec
-                    conflictResolution True root priorCause allIncompats partial
+                    conflictResolution True root priorCause model
 
 
-updateAllIncompatsHelper : Bool -> Int -> Incompatibility -> List Incompatibility -> PartialSolution -> ( PartialSolution, Incompatibility, List Incompatibility )
-updateAllIncompatsHelper incompatChanged previousSatisfierLevel incompat allIncompats partial =
-    ( PartialSolution.dropUntilLevel previousSatisfierLevel partial
-    , incompat
-    , if incompatChanged then
-        incompat :: allIncompats
+backtrack : Bool -> Int -> Incompatibility -> Model -> ( Incompatibility, Model )
+backtrack incompatChanged previousSatisfierLevel incompat model =
+    ( incompat
+    , { partialSolution = PartialSolution.dropUntilLevel previousSatisfierLevel model.partialSolution
+      , incompatibilities =
+            if incompatChanged then
+                incompat :: model.incompatibilities
 
-      else
-        allIncompats
+            else
+                model.incompatibilities
+      }
     )
