@@ -19,7 +19,7 @@ type alias Model =
 
 init : String -> Version -> Model
 init root version =
-    { incompatibilities = [ Dict.singleton root (Term.Negative (Range.exact version)) ]
+    { incompatibilities = [ Incompatibility.fromTerm root (Term.Negative (Range.exact version)) ]
     , partialSolution = []
     }
 
@@ -142,7 +142,7 @@ pickPackageVersion partial listAvailableVersions =
         Just ( name, term ) ->
             pickVersion (listAvailableVersions name) term
                 |> Maybe.map (Tuple.pair name)
-                |> Result.fromMaybe ( name, Dict.singleton name term )
+                |> Result.fromMaybe ( name, Incompatibility.fromTerm name term )
                 |> Just
 
         Nothing ->
@@ -224,7 +224,7 @@ unitPropagationLoop root package changed loopIncompatibilities model =
                     unitPropagationLoop root pack othersChanged model.incompatibilities model
 
         incompat :: othersIncompat ->
-            if Dict.member package incompat then
+            if Dict.member package (Incompatibility.asDict incompat) then
                 case Incompatibility.relation incompat (PartialSolution.toDict model.partialSolution) of
                     Incompatibility.Satisfies ->
                         case conflictResolution False root incompat model of
@@ -267,7 +267,7 @@ unitPropagationLoop root package changed loopIncompatibilities model =
 -}
 conflictResolution : Bool -> String -> Incompatibility -> Model -> Result String ( Incompatibility, Model )
 conflictResolution incompatChanged root incompat model =
-    if Dict.isEmpty incompat || Incompatibility.singlePositive root incompat then
+    if Dict.isEmpty (Incompatibility.asDict incompat) || Incompatibility.singlePositive root incompat then
         Err reportError
 
     else

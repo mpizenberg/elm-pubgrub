@@ -183,7 +183,7 @@ searchSatisfier incompat buildPartial { left, right } assignment earlierAssignme
         -- if it satisfies, search right (earlier assignments)
         Incompatibility.Satisfies ->
             if right == 0 then
-                case Dict.get assignment.name incompat of
+                case Dict.get assignment.name (Incompatibility.asDict incompat) of
                     Just term ->
                         Found
                             ( assignment
