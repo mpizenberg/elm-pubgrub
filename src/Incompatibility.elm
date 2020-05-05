@@ -1,4 +1,4 @@
-module Incompatibility exposing (Incompatibility, Relation(..), asDict, fromDependencies, fromDict, fromTerm, merge, priorCause, relation, singlePositive, termUnion, toDebugString)
+module Incompatibility exposing (Incompatibility, Relation(..), asDict, fromDependencies, fromTerm, insert, merge, priorCause, relation, singlePositive, toDebugString)
 
 import Dict exposing (Dict)
 import Json.Encode
@@ -7,8 +7,10 @@ import Term exposing (Term)
 import Version exposing (Version)
 
 
+{-| Hold a dual implementation of Dict and List for efficient runtime.
+-}
 type Incompatibility
-    = Incompatibility (Dict String Term)
+    = Incompatibility (Dict String Term) (List ( String, Term ))
 
 
 type Relation
@@ -23,18 +25,13 @@ type Relation
 
 
 asDict : Incompatibility -> Dict String Term
-asDict (Incompatibility incompat) =
+asDict (Incompatibility incompat _) =
     incompat
-
-
-fromDict : Dict String Term -> Incompatibility
-fromDict =
-    Incompatibility
 
 
 fromTerm : String -> Term -> Incompatibility
 fromTerm package term =
-    Incompatibility (Dict.singleton package term)
+    Incompatibility (Dict.singleton package term) [ ( package, term ) ]
 
 
 
@@ -42,7 +39,7 @@ fromTerm package term =
 
 
 toDebugString : Int -> Incompatibility -> String
-toDebugString indentation (Incompatibility incompat) =
+toDebugString indentation (Incompatibility incompat _) =
     Json.Encode.encode indentation <|
         Json.Encode.dict
             identity
@@ -55,31 +52,29 @@ toDebugString indentation (Incompatibility incompat) =
 
 
 singlePositive : String -> Incompatibility -> Bool
-singlePositive package (Incompatibility incompat) =
-    if Dict.size incompat == 1 then
-        case Dict.get package incompat of
-            Just (Term.Positive _) ->
-                True
+singlePositive package (Incompatibility _ incompat) =
+    case incompat of
+        ( name, Term.Positive _ ) :: [] ->
+            name == package
 
-            _ ->
-                False
-
-    else
-        False
+        _ ->
+            False
 
 
 {-| Generate a list of incompatibilities from direct dependencies of a package.
+Dependencies MUST be unique (no duplicate package name)
+due to usage of insert here.
 -}
 fromDependencies : String -> Version -> List ( String, Range ) -> List Incompatibility
 fromDependencies package version dependencies =
     let
         baseIncompat =
-            Dict.singleton package (Term.Positive (Range.exact version))
+            fromTerm package (Term.Positive (Range.exact version))
 
-        addIncompat ( name, range ) accumIncompats =
-            Incompatibility (Dict.insert name (Term.Negative range) baseIncompat) :: accumIncompats
+        addDependency ( name, range ) accumIncompats =
+            insert name (Term.Negative range) baseIncompat :: accumIncompats
     in
-    List.foldl addIncompat [] dependencies
+    List.foldl addDependency [] dependencies
 
 
 {-| Add incompatibilities obtained from dependencies in to the set of incompatibilities.
@@ -106,31 +101,25 @@ merge incompat allIncompats =
 {-| union of incompat and satisfier's cause minus terms referring to satisfier's package"
 -}
 priorCause : String -> Incompatibility -> Incompatibility -> Incompatibility
-priorCause name (Incompatibility cause) (Incompatibility incompat) =
+priorCause name (Incompatibility cause _) (Incompatibility incompat _) =
     union (Dict.remove name cause) (Dict.remove name incompat)
 
 
 union : Dict String Term -> Dict String Term -> Incompatibility
 union i1 i2 =
-    let
-        ( small, big ) =
-            if Dict.size i1 < Dict.size i2 then
-                ( i1, i2 )
-
-            else
-                ( i2, i1 )
-    in
-    Dict.foldl termUnion (Incompatibility big) small
+    Dict.merge insert fuse insert i1 i2 (Incompatibility Dict.empty [])
 
 
-termUnion : String -> Term -> Incompatibility -> Incompatibility
-termUnion name term (Incompatibility incompat) =
-    case Dict.get name incompat of
-        Nothing ->
-            Incompatibility (Dict.insert name term incompat)
+{-| Use only if guaranted that name is not already in the incompatibility
+-}
+insert : String -> Term -> Incompatibility -> Incompatibility
+insert name term (Incompatibility dict list) =
+    Incompatibility (Dict.insert name term dict) (( name, term ) :: list)
 
-        Just baseTerm ->
-            Incompatibility (Dict.insert name (Term.union term baseTerm) incompat)
+
+fuse : String -> Term -> Term -> Incompatibility -> Incompatibility
+fuse name t1 t2 incompatibility =
+    insert name (Term.union t1 t2) incompatibility
 
 
 {-| We say that a set of terms S satisfies an incompatibility I
@@ -141,8 +130,8 @@ If S satisfies all but one of I's terms and is inconclusive for the remaining te
 we say S "almost satisfies" I and we call the remaining term the "unsatisfied term".
 -}
 relation : Incompatibility -> Dict String (List Term) -> Relation
-relation (Incompatibility incompat) set =
-    relationStep set (Dict.toList incompat) Satisfies
+relation (Incompatibility _ list) set =
+    relationStep set list Satisfies
 
 
 relationStep : Dict String (List Term) -> List ( String, Term ) -> Relation -> Relation

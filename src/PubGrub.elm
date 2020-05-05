@@ -322,7 +322,9 @@ continueResolution incompatChanged root incompat model =
                             Term.union term (Term.negate satisfierTerm)
 
                         newIncompat =
-                            Incompatibility.termUnion satisfier.name derived priorCause
+                            -- priorCause is guaranted to not contain satisfier.name
+                            -- so we can safely insert the derived term.
+                            Incompatibility.insert satisfier.name derived priorCause
                     in
                     -- set incompat to newIncompat
                     -- TODO: tail rec
