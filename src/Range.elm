@@ -3,7 +3,7 @@ module Range exposing
     , toDebugString
     , none, any, exact, higherThan, lowerThan, between
     , negate, intersection, union
-    , contains, getExactVersion
+    , contains
     )
 
 {-| Dealing with version ranges union and intersection.
@@ -16,7 +16,7 @@ module Range exposing
 
 @docs negate, intersection, union
 
-@docs contains, getExactVersion
+@docs contains
 
 -}
 
@@ -254,17 +254,3 @@ intervalsContains version intervals =
 
             else
                 intervalsContains version others
-
-
-getExactVersion : Range -> Maybe Version
-getExactVersion (Range intervals) =
-    case intervals of
-        ( start, Just end ) :: [] ->
-            if Version.bumpPatch start == end then
-                Just start
-
-            else
-                Nothing
-
-        _ ->
-            Nothing

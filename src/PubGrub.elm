@@ -312,10 +312,10 @@ continueResolution incompatChanged root incompat model =
     in
     case satisfier.kind of
         -- if satisfier.kind == Assignment.Decision || previousSatisfierLevel /= satisfier.decisionLevel then
-        Assignment.Decision ->
+        Assignment.Decision _ ->
             Ok (backtrack incompatChanged previousSatisfierLevel incompat model)
 
-        Assignment.Derivation { cause } ->
+        Assignment.Derivation satisfierTerm { cause } ->
             if previousSatisfierLevel /= satisfier.decisionLevel then
                 Ok (backtrack incompatChanged previousSatisfierLevel incompat model)
 
@@ -326,13 +326,13 @@ continueResolution incompatChanged root incompat model =
                         Incompatibility.priorCause satisfier.name cause incompat
                 in
                 -- if satisfier does not satisfy term
-                if not (Term.satisfies term [ satisfier.term ]) then
+                if not (Term.satisfies term [ satisfierTerm ]) then
                     -- add `not (satisfier \ term)` to priorCause. Then set incompat to priorCause
                     -- satisfier \ term  ===  intersection satisfier (not term)
                     -- not (...)  ===  union (not satisfier) (term)
                     let
                         derived =
-                            Term.union term (Term.negate satisfier.term)
+                            Term.union term (Term.negate satisfierTerm)
 
                         newIncompat =
                             Incompatibility.termUnion satisfier.name derived priorCause

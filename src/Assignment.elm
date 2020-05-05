@@ -1,4 +1,4 @@
-module Assignment exposing (Assignment, Kind(..), encodeDebug, finalDecision, newDecision, newDerivation)
+module Assignment exposing (Assignment, Kind(..), encodeDebug, finalDecision, getTerm, newDecision, newDerivation)
 
 import Incompatibility exposing (Incompatibility)
 import Json.Encode exposing (Value)
@@ -9,17 +9,16 @@ import Version exposing (Version)
 
 type alias Assignment =
     { name : String
-    , term : Term
     , decisionLevel : Int
     , kind : Kind
     }
 
 
 type Kind {- Decision: individual package ids -}
-    = Decision
+    = Decision Version
       -- Derivation: "ranges" terms that must be true
       -- given previous assignments and all incompatibilities
-    | Derivation { cause : Incompatibility }
+    | Derivation Term { cause : Incompatibility }
 
 
 
@@ -27,57 +26,60 @@ type Kind {- Decision: individual package ids -}
 
 
 encodeDebug : Assignment -> Value
-encodeDebug { name, term, decisionLevel, kind } =
-    Json.Encode.object
-        [ ( "kind", Json.Encode.string (kindToString kind) )
-        , ( "name", Json.Encode.string name )
-        , ( "decisionLevel", Json.Encode.int decisionLevel )
-        , ( "term", Json.Encode.string (Term.toDebugString term) )
-        ]
-
-
-kindToString : Kind -> String
-kindToString kind =
+encodeDebug { name, decisionLevel, kind } =
     case kind of
-        Decision ->
-            "Decision"
+        Decision version ->
+            Json.Encode.object
+                [ ( "kind", Json.Encode.string "Decision" )
+                , ( "name", Json.Encode.string name )
+                , ( "decisionLevel", Json.Encode.int decisionLevel )
+                , ( "version", Json.Encode.string (Version.toDebugString version) )
+                ]
 
-        Derivation _ ->
-            "Derivation"
+        Derivation term _ ->
+            Json.Encode.object
+                [ ( "kind", Json.Encode.string "Derivation" )
+                , ( "name", Json.Encode.string name )
+                , ( "decisionLevel", Json.Encode.int decisionLevel )
+                , ( "term", Json.Encode.string (Term.toDebugString term) )
+                ]
 
 
 
 -- Functions
 
 
-finalDecision : Assignment -> Maybe { name : String, version : Version }
-finalDecision { name, term, kind } =
-    case ( kind, term ) of
-        ( Decision, Term.Positive range ) ->
-            case Range.getExactVersion range of
-                Just version ->
-                    Just { name = name, version = version }
+getTerm : Kind -> Term
+getTerm kind =
+    case kind of
+        Decision version ->
+            Term.Positive (Range.exact version)
 
-                Nothing ->
-                    Debug.todo "Should not be possible to have a decision without an exact version"
+        Derivation term _ ->
+            term
+
+
+finalDecision : Assignment -> Maybe { name : String, version : Version }
+finalDecision { name, kind } =
+    case kind of
+        Decision version ->
+            Just { name = name, version = version }
 
         _ ->
             Nothing
 
 
-newDecision : String -> Term -> Int -> Assignment
-newDecision name term decisionLevel =
+newDecision : String -> Version -> Int -> Assignment
+newDecision name version decisionLevel =
     { name = name
-    , term = term
     , decisionLevel = decisionLevel
-    , kind = Decision
+    , kind = Decision version
     }
 
 
 newDerivation : String -> Term -> Int -> Incompatibility -> Assignment
 newDerivation name term decisionLevel cause =
     { name = name
-    , term = term
     , decisionLevel = decisionLevel
-    , kind = Derivation { cause = cause }
+    , kind = Derivation term { cause = cause }
     }

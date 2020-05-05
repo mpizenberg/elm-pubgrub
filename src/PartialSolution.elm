@@ -46,11 +46,11 @@ splitDecisions partial ( decisions, derivations ) =
 
         assignment :: others ->
             case assignment.kind of
-                Assignment.Decision ->
+                Assignment.Decision _ ->
                     splitDecisions others ( Set.insert assignment.name decisions, derivations )
 
-                Assignment.Derivation _ ->
-                    splitDecisions others ( decisions, Dict.update assignment.name (Just << (::) assignment.term << Maybe.withDefault []) derivations )
+                Assignment.Derivation term _ ->
+                    splitDecisions others ( decisions, Dict.update assignment.name (Just << (::) term << Maybe.withDefault []) derivations )
 
 
 {-| We can add the version to the partial solution as a decision
@@ -63,7 +63,7 @@ canAddVersion : String -> Version -> List Incompatibility -> PartialSolution -> 
 canAddVersion name version newIncompatibilities partial =
     let
         updatedPartial =
-            prependDecision name (Term.Positive (Range.exact version)) partial
+            prependDecision name version partial
     in
     ( doesNotSatisfy newIncompatibilities (toDict updatedPartial), updatedPartial )
 
@@ -83,18 +83,18 @@ doesNotSatisfy newIncompatibilities partial =
                     doesNotSatisfy others partial
 
 
-prependDecision : String -> Term -> PartialSolution -> PartialSolution
-prependDecision name term partial =
+prependDecision : String -> Version -> PartialSolution -> PartialSolution
+prependDecision name version partial =
     case partial of
         [] ->
-            [ Assignment.newDecision name term 0 ]
+            [ Assignment.newDecision name version 0 ]
 
         { decisionLevel } :: _ ->
             let
                 _ =
-                    Debug.log ("Decision level " ++ String.fromInt decisionLevel ++ " : " ++ name ++ " : " ++ Term.toDebugString term) ""
+                    Debug.log ("Decision level " ++ String.fromInt decisionLevel ++ " : " ++ name ++ " : " ++ Version.toDebugString version) ""
             in
-            Assignment.newDecision name term (decisionLevel + 1) :: partial
+            Assignment.newDecision name version (decisionLevel + 1) :: partial
 
 
 prependDerivation : String -> Term -> Incompatibility -> PartialSolution -> PartialSolution
@@ -118,17 +118,17 @@ toDict partial =
 
 addAssignment : Assignment -> Dict String (List Term) -> Dict String (List Term)
 addAssignment assignment allTerms =
-    Dict.update assignment.name (addTerm assignment.term) allTerms
+    Dict.update assignment.name (addTerm assignment) allTerms
 
 
-addTerm : Term -> Maybe (List Term) -> Maybe (List Term)
-addTerm term maybeTerms =
+addTerm : Assignment -> Maybe (List Term) -> Maybe (List Term)
+addTerm assignment maybeTerms =
     case maybeTerms of
         Nothing ->
-            Just [ term ]
+            Just [ Assignment.getTerm assignment.kind ]
 
         Just otherTerms ->
-            Just (term :: otherTerms)
+            Just (Assignment.getTerm assignment.kind :: otherTerms)
 
 
 dropUntilLevel : Int -> PartialSolution -> PartialSolution
@@ -226,16 +226,16 @@ isSolutionRec partial precondition =
 
         ( True, assignment :: others ) ->
             case assignment.kind of
-                Assignment.Decision ->
+                Assignment.Decision _ ->
                     isSolutionRec others True
 
-                Assignment.Derivation _ ->
-                    case assignment.term of
+                Assignment.Derivation term _ ->
+                    case term of
                         Term.Negative _ ->
                             isSolutionRec others True
 
                         Term.Positive _ ->
-                            isSolutionRec others (Term.satisfies assignment.term (getDecision assignment.name others))
+                            isSolutionRec others (Term.satisfies term (getDecision assignment.name others))
 
 
 getDecision : String -> PartialSolution -> List Term
@@ -246,9 +246,9 @@ getDecision searchedName partial =
 
         assignment :: others ->
             case assignment.kind of
-                Assignment.Decision ->
+                Assignment.Decision version ->
                     if assignment.name == searchedName then
-                        [ assignment.term ]
+                        [ Term.Positive (Range.exact version) ]
 
                     else
                         getDecision searchedName others
