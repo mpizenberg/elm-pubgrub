@@ -1,11 +1,10 @@
-module PartialSolution exposing (PartialSolution, canAddVersion, dropUntilLevel, empty, encode, findPreviousSatisfier, findSatisfier, isSolution, prependDecision, prependDerivation, splitDecisions, toDebugString, toDict, toSolution)
+module PartialSolution exposing (PartialSolution, addVersion, dropUntilLevel, empty, encode, findPreviousSatisfier, findSatisfier, potentialPackages, prependDecision, prependDerivation, relation, solution, toDebugString)
 
 import Assignment exposing (Assignment)
 import Dict exposing (Dict)
-import Incompatibility exposing (Incompatibility)
+import Incompatibility exposing (Incompatibility, Relation)
 import Json.Encode exposing (Value)
 import Range
-import Set exposing (Set)
 import Term exposing (Term)
 import Utils exposing (SearchDecision(..))
 import Version exposing (Version)
@@ -15,14 +14,36 @@ import Version exposing (Version)
 are quite useful for some parts of the pubgrub algorithm.
 Maybe a custom opaque type with both forms would provide performance benefits.
 This could be fun to benchmark :)
+
+Since Dict are persistent data structures sharing a lot of data,
+it may not be so bad to keep a dict of organized terms for each partial solution entry.
+
 -}
 type PartialSolution
-    = PartialSolution (List Assignment)
+    = PartialSolution (List ( Assignment, Memory ))
+
+
+type alias Memory =
+    Dict String PackageMemory
+
+
+type alias PackageMemory =
+    { decision : Maybe Version, derivations : List Term }
 
 
 empty : PartialSolution
 empty =
     PartialSolution []
+
+
+memoryTerms : String -> PackageMemory -> List Term
+memoryTerms _ { decision, derivations } =
+    case decision of
+        Nothing ->
+            derivations
+
+        Just version ->
+            Term.Positive (Range.exact version) :: derivations
 
 
 
@@ -36,26 +57,35 @@ toDebugString partial =
 
 encode : PartialSolution -> Value
 encode (PartialSolution partial) =
-    Json.Encode.list Assignment.encodeDebug partial
+    Json.Encode.list (Assignment.encodeDebug << Tuple.first) partial
 
 
 
 -- Functions
 
 
-splitDecisions : PartialSolution -> ( Set String, Dict String (List Term) ) -> ( Set String, Dict String (List Term) )
-splitDecisions (PartialSolution partial) ( decisions, derivations ) =
+potentialPackages : PartialSolution -> Dict String (List Term)
+potentialPackages (PartialSolution partial) =
     case partial of
         [] ->
-            ( decisions, derivations )
+            Dict.empty
 
-        assignment :: others ->
-            case assignment.kind of
-                Assignment.Decision _ ->
-                    splitDecisions (PartialSolution others) ( Set.insert assignment.name decisions, derivations )
+        ( _, memory ) :: _ ->
+            Utils.dictFilterMap potentialPackage memory
 
-                Assignment.Derivation term _ ->
-                    splitDecisions (PartialSolution others) ( decisions, Dict.update assignment.name (Just << (::) term << Maybe.withDefault []) derivations )
+
+potentialPackage : String -> { decision : Maybe Version, derivations : List Term } -> Maybe (List Term)
+potentialPackage _ { decision, derivations } =
+    case decision of
+        Just _ ->
+            Nothing
+
+        Nothing ->
+            if List.any Term.isPositive derivations then
+                Just derivations
+
+            else
+                Nothing
 
 
 {-| We can add the version to the partial solution as a decision
@@ -64,104 +94,166 @@ In practice I think it can only produce a conflict if one of the dependencies
 (which are used to make the new incompatibilities)
 is already in the partial solution with an incompatible version.
 -}
-canAddVersion : String -> Version -> List Incompatibility -> PartialSolution -> ( Bool, PartialSolution )
-canAddVersion name version newIncompatibilities partial =
+addVersion : String -> Version -> List Incompatibility -> PartialSolution -> Maybe PartialSolution
+addVersion name version newIncompatibilities partial =
     let
         updatedPartial =
             prependDecision name version partial
     in
-    ( doesNotSatisfy newIncompatibilities (toDict updatedPartial), updatedPartial )
+    if doesNotSatisfy newIncompatibilities updatedPartial then
+        Just updatedPartial
+
+    else
+        Nothing
 
 
-doesNotSatisfy : List Incompatibility -> Dict String (List Term) -> Bool
-doesNotSatisfy newIncompatibilities partial =
-    case newIncompatibilities of
-        [] ->
+doesNotSatisfy : List Incompatibility -> PartialSolution -> Bool
+doesNotSatisfy newIncompatibilities (PartialSolution partial) =
+    case ( newIncompatibilities, partial ) of
+        ( _, [] ) ->
             True
 
-        incompat :: others ->
-            case Incompatibility.relation incompat partial of
+        ( [], _ ) ->
+            True
+
+        ( incompat :: others, ( _, memory ) :: _ ) ->
+            case Incompatibility.relation incompat (Dict.map memoryTerms memory) of
                 Incompatibility.Satisfies ->
                     False
 
                 _ ->
-                    doesNotSatisfy others partial
+                    doesNotSatisfy others (PartialSolution partial)
+
+
+relation : Incompatibility -> PartialSolution -> Relation
+relation incompatibility partial =
+    Incompatibility.relation incompatibility (Dict.map memoryTerms (firstMemory partial))
+
+
+firstMemory : PartialSolution -> Memory
+firstMemory (PartialSolution partial) =
+    List.head partial
+        |> Maybe.map Tuple.second
+        |> Maybe.withDefault Dict.empty
 
 
 prependDecision : String -> Version -> PartialSolution -> PartialSolution
 prependDecision name version (PartialSolution partial) =
     case partial of
         [] ->
-            PartialSolution [ Assignment.newDecision name version 0 ]
+            PartialSolution
+                [ ( Assignment.newDecision name version 0
+                  , Dict.singleton name { decision = Just version, derivations = [] }
+                  )
+                ]
 
-        { decisionLevel } :: _ ->
+        ( { decisionLevel }, memory ) :: _ ->
             let
                 _ =
                     Debug.log ("Decision level " ++ String.fromInt decisionLevel ++ " : " ++ name ++ " : " ++ Version.toDebugString version) ""
+
+                decision =
+                    Assignment.newDecision name version (decisionLevel + 1)
+
+                newMemory =
+                    Dict.update name (updateMemoryVersion version) memory
             in
-            PartialSolution (Assignment.newDecision name version (decisionLevel + 1) :: partial)
+            PartialSolution (( decision, newMemory ) :: partial)
+
+
+updateMemoryVersion : Version -> Maybe PackageMemory -> Maybe PackageMemory
+updateMemoryVersion version maybe =
+    case maybe of
+        Nothing ->
+            Just { decision = Just version, derivations = [] }
+
+        Just { decision, derivations } ->
+            case decision of
+                Nothing ->
+                    Just { decision = Just version, derivations = derivations }
+
+                Just _ ->
+                    Debug.todo "Cannot change a decision already made!"
 
 
 prependDerivation : String -> Term -> Incompatibility -> PartialSolution -> PartialSolution
 prependDerivation name term cause (PartialSolution partial) =
     case partial of
         [] ->
-            PartialSolution [ Assignment.newDerivation name term 0 cause ]
+            PartialSolution
+                [ ( Assignment.newDerivation name term 0 cause
+                  , Dict.singleton name { decision = Nothing, derivations = [ term ] }
+                  )
+                ]
 
-        { decisionLevel } :: _ ->
+        ( { decisionLevel }, memory ) :: _ ->
             let
                 _ =
                     Debug.log ("Derivation : " ++ name ++ " : " ++ Term.toDebugString term) ""
+
+                derivation =
+                    Assignment.newDerivation name term decisionLevel cause
+
+                newMemory =
+                    Dict.update name (updateMemoryTerm term) memory
             in
-            PartialSolution (Assignment.newDerivation name term decisionLevel cause :: partial)
+            PartialSolution (( derivation, newMemory ) :: partial)
 
 
-toDict : PartialSolution -> Dict String (List Term)
-toDict (PartialSolution partial) =
-    List.foldr addAssignment Dict.empty partial
-
-
-addAssignment : Assignment -> Dict String (List Term) -> Dict String (List Term)
-addAssignment assignment allTerms =
-    Dict.update assignment.name (addTerm assignment) allTerms
-
-
-addTerm : Assignment -> Maybe (List Term) -> Maybe (List Term)
-addTerm assignment maybeTerms =
-    case maybeTerms of
+updateMemoryTerm : Term -> Maybe PackageMemory -> Maybe PackageMemory
+updateMemoryTerm term maybe =
+    case maybe of
         Nothing ->
-            Just [ Assignment.getTerm assignment.kind ]
+            Just { decision = Nothing, derivations = [ term ] }
 
-        Just otherTerms ->
-            Just (Assignment.getTerm assignment.kind :: otherTerms)
+        Just { decision, derivations } ->
+            Just { decision = decision, derivations = term :: derivations }
 
 
 dropUntilLevel : Int -> PartialSolution -> PartialSolution
-dropUntilLevel level ((PartialSolution partial) as ps) =
+dropUntilLevel level (PartialSolution partial) =
     case partial of
         [] ->
-            PartialSolution []
+            empty
 
-        assignment :: others ->
-            if assignment.decisionLevel > level then
+        ( { decisionLevel }, _ ) :: others ->
+            if decisionLevel > level then
                 dropUntilLevel level (PartialSolution others)
 
             else
                 let
+                    debugString =
+                        toDebugString (PartialSolution partial)
+
                     _ =
-                        Debug.log ("Backtrack partial solution to:\n" ++ toDebugString ps) ""
+                        Debug.log ("Backtrack partial solution to:\n" ++ debugString) ""
                 in
-                ps
+                PartialSolution partial
 
 
+{-| A satisfier is the earliest assignment in partial solution such that the incompatibility
+is satisfied by the partial solution up to and including that assignment.
+Also returns all assignments earlier than the satisfier.
+We call the term in the incompatibility that refers to the same package "term".
+-}
 findSatisfier : Incompatibility -> PartialSolution -> ( Assignment, PartialSolution, Term )
 findSatisfier incompat (PartialSolution partial) =
-    case Utils.find (searchSatisfier incompat (\assign earlier -> PartialSolution (assign :: earlier))) partial of
+    case Utils.find (searchSatisfier incompat addAssignment) partial of
         Just x ->
             x
 
         Nothing ->
             Debug.todo "should always find something"
+
+
+addAssignment : Assignment -> Memory -> Memory
+addAssignment assignment memory =
+    case assignment.kind of
+        Assignment.Decision version ->
+            Dict.update assignment.name (updateMemoryVersion version) memory
+
+        Assignment.Derivation term _ ->
+            Dict.update assignment.name (updateMemoryTerm term) memory
 
 
 {-| Earliest assignment in the partial solution before satisfier
@@ -170,21 +262,25 @@ and including that assignment plus satisfier.
 -}
 findPreviousSatisfier : Assignment -> Incompatibility -> PartialSolution -> Maybe ( Assignment, PartialSolution, Term )
 findPreviousSatisfier satisfier incompat (PartialSolution earlierPartial) =
-    Utils.find (searchSatisfier incompat (\assign earlier -> PartialSolution (satisfier :: assign :: earlier))) earlierPartial
-
-
-{-| A satisfier is the earliest assignment in partial solution such that the incompatibility
-is satisfied by the partial solution up to and including that assignment.
-Also returns all assignments earlier than the satisfier.
-We call the term in the incompatibility that refers to the same package "term".
--}
-searchSatisfier : Incompatibility -> (Assignment -> List Assignment -> PartialSolution) -> { left : Int, right : Int } -> Assignment -> List Assignment -> SearchDecision ( Assignment, PartialSolution, Term )
-searchSatisfier incompat buildPartial { left, right } assignment earlierAssignments =
     let
-        partial =
-            buildPartial assignment earlierAssignments
+        buildMemory assignment earlierMemory =
+            addAssignment satisfier (addAssignment assignment earlierMemory)
     in
-    case Incompatibility.relation incompat (toDict partial) of
+    Utils.find (searchSatisfier incompat buildMemory) earlierPartial
+
+
+searchSatisfier : Incompatibility -> (Assignment -> Memory -> Memory) -> { left : Int, right : Int } -> ( Assignment, Memory ) -> List ( Assignment, Memory ) -> SearchDecision ( Assignment, PartialSolution, Term )
+searchSatisfier incompat buildMemory { left, right } ( assignment, _ ) earlier =
+    let
+        earlierMemory =
+            List.head earlier
+                |> Maybe.map Tuple.second
+                |> Maybe.withDefault Dict.empty
+
+        memory =
+            buildMemory assignment earlierMemory
+    in
+    case Incompatibility.relation incompat (Dict.map memoryTerms memory) of
         -- if it satisfies, search right (earlier assignments)
         Incompatibility.Satisfies ->
             if right == 0 then
@@ -192,7 +288,7 @@ searchSatisfier incompat buildPartial { left, right } assignment earlierAssignme
                     Just term ->
                         Found
                             ( assignment
-                            , PartialSolution earlierAssignments
+                            , PartialSolution earlier
                             , term
                             )
 
@@ -215,57 +311,31 @@ searchSatisfier incompat buildPartial { left, right } assignment earlierAssignme
 -- Final solution
 
 
-toSolution : PartialSolution -> List { name : String, version : Version }
-toSolution (PartialSolution partial) =
-    List.filterMap Assignment.finalDecision partial
-
-
 {-| If a partial solution has, for every positive derivation,
 a corresponding decision that satisfies that assignment,
 it's a total solution and version solving has succeeded.
 -}
-isSolution : PartialSolution -> Bool
-isSolution (PartialSolution partial) =
-    isSolutionRec (List.reverse partial) True
-
-
-isSolutionRec : List Assignment -> Bool -> Bool
-isSolutionRec partial precondition =
-    case ( precondition, partial ) of
-        ( False, _ ) ->
-            False
-
-        ( True, [] ) ->
-            True
-
-        ( True, assignment :: others ) ->
-            case assignment.kind of
-                Assignment.Decision _ ->
-                    isSolutionRec others True
-
-                Assignment.Derivation term _ ->
-                    case term of
-                        Term.Negative _ ->
-                            isSolutionRec others True
-
-                        Term.Positive _ ->
-                            isSolutionRec others (Term.satisfies term (getDecision assignment.name others))
-
-
-getDecision : String -> List Assignment -> List Term
-getDecision searchedName partial =
+solution : PartialSolution -> Maybe (List ( String, Version ))
+solution (PartialSolution partial) =
     case partial of
         [] ->
-            []
+            Just []
 
-        assignment :: others ->
-            case assignment.kind of
-                Assignment.Decision version ->
-                    if assignment.name == searchedName then
-                        [ Term.Positive (Range.exact version) ]
+        ( _, memory ) :: _ ->
+            if Utils.dictAll isValidPackage memory then
+                Utils.dictFilterMap (\_ { decision } -> decision) memory
+                    |> Dict.toList
+                    |> Just
 
-                    else
-                        getDecision searchedName others
+            else
+                Nothing
 
-                _ ->
-                    getDecision searchedName others
+
+isValidPackage : String -> PackageMemory -> Bool
+isValidPackage _ { decision, derivations } =
+    case decision of
+        Nothing ->
+            not (List.any Term.isPositive derivations)
+
+        Just _ ->
+            True

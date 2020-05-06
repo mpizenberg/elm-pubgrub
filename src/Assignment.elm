@@ -1,4 +1,4 @@
-module Assignment exposing (Assignment, Kind(..), encodeDebug, finalDecision, getTerm, newDecision, newDerivation)
+module Assignment exposing (Assignment, Kind(..), encodeDebug, getTerm, newDecision, newDerivation)
 
 import Incompatibility exposing (Incompatibility)
 import Json.Encode exposing (Value)
@@ -57,16 +57,6 @@ getTerm kind =
 
         Derivation term _ ->
             term
-
-
-finalDecision : Assignment -> Maybe { name : String, version : Version }
-finalDecision { name, kind } =
-    case kind of
-        Decision version ->
-            Just { name = name, version = version }
-
-        _ ->
-            Nothing
 
 
 newDecision : String -> Version -> Int -> Assignment

@@ -2,11 +2,10 @@ module PubGrub exposing (solve)
 
 import Assignment
 import Database.Stub as Stub
-import Dict exposing (Dict)
+import Dict
 import Incompatibility exposing (Incompatibility)
 import PartialSolution exposing (PartialSolution)
 import Range exposing (Range)
-import Set
 import Term exposing (Term)
 import Version exposing (Version)
 
@@ -56,12 +55,12 @@ updatePartialSolution f { incompatibilities, partialSolution } =
 -- PubGrub algorithm
 
 
-solve : String -> Version -> Result String (List { name : String, version : Version })
+solve : String -> Version -> Result String (List ( String, Version ))
 solve root version =
     solveRec root root (init root version)
 
 
-solveRec : String -> String -> Model -> Result String (List { name : String, version : Version })
+solveRec : String -> String -> Model -> Result String (List ( String, Version ))
 solveRec root package model =
     case unitPropagation root package model of
         Err msg ->
@@ -70,11 +69,8 @@ solveRec root package model =
         Ok updatedModel ->
             case makeDecision Stub.listAvailableVersions updatedModel of
                 Nothing ->
-                    if PartialSolution.isSolution updatedModel.partialSolution then
-                        Ok (PartialSolution.toSolution updatedModel.partialSolution)
-
-                    else
-                        Err "Is this possible???"
+                    PartialSolution.solution updatedModel.partialSolution
+                        |> Result.fromMaybe "Is this possible???"
 
                 Just ( next, updatedAgainModel ) ->
                     solveRec root next updatedAgainModel
@@ -112,11 +108,11 @@ makeDecision listAvailableVersions model =
                 updatedIncompatibilities =
                     List.foldr Incompatibility.merge model.incompatibilities depIncompats
             in
-            case PartialSolution.canAddVersion name version depIncompats model.partialSolution of
-                ( False, _ ) ->
+            case PartialSolution.addVersion name version depIncompats model.partialSolution of
+                Nothing ->
                     Just ( name, setIncompatibilities updatedIncompatibilities model )
 
-                ( True, updatedPartial ) ->
+                Just updatedPartial ->
                     Just ( name, Model updatedIncompatibilities updatedPartial )
 
 
@@ -164,20 +160,10 @@ Here we just pick the first one.
 -}
 pickPackage : PartialSolution -> Maybe ( String, Term )
 pickPackage partial =
-    potentialPackages partial
+    PartialSolution.potentialPackages partial
         |> Dict.toList
         |> List.head
         |> Maybe.map (Tuple.mapSecond (Term.listIntersection Nothing))
-
-
-potentialPackages : PartialSolution -> Dict String (List Term)
-potentialPackages partial =
-    let
-        -- ( Set String, Dict String (List Term) )
-        ( decisions, derivations ) =
-            PartialSolution.splitDecisions partial ( Set.empty, Dict.empty )
-    in
-    Dict.filter (\name terms -> not (Set.member name decisions) && List.any Term.isPositive terms) derivations
 
 
 {-| Pub chooses the latest matching version of the package
@@ -225,7 +211,7 @@ unitPropagationLoop root package changed loopIncompatibilities model =
 
         incompat :: othersIncompat ->
             if Dict.member package (Incompatibility.asDict incompat) then
-                case Incompatibility.relation incompat (PartialSolution.toDict model.partialSolution) of
+                case PartialSolution.relation incompat model.partialSolution of
                     Incompatibility.Satisfies ->
                         case conflictResolution False root incompat model of
                             Err msg ->
@@ -233,7 +219,7 @@ unitPropagationLoop root package changed loopIncompatibilities model =
 
                             Ok ( priorCause, updatedModel ) ->
                                 -- priorCause is guaranted to be almost satisfied by the partial solution
-                                case Incompatibility.relation priorCause (PartialSolution.toDict updatedModel.partialSolution) of
+                                case PartialSolution.relation priorCause updatedModel.partialSolution of
                                     Incompatibility.AlmostSatisfies name term ->
                                         let
                                             -- add (not term) to partial solution with incompat as cause
