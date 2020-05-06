@@ -99,7 +99,7 @@ makeDecision listAvailableVersions model =
                     Incompatibility.fromDependencies name version dependencies
 
                 _ =
-                    Debug.log "Add the following incompatibilities" ""
+                    Debug.log ("Add the following " ++ String.fromInt (List.length depIncompats) ++ " incompatibilities from dependencies") ""
 
                 _ =
                     depIncompats
@@ -328,6 +328,10 @@ backtrack incompatChanged previousSatisfierLevel incompat model =
     , { partialSolution = PartialSolution.dropUntilLevel previousSatisfierLevel model.partialSolution
       , incompatibilities =
             if incompatChanged then
+                let
+                    _ =
+                        Debug.log ("Add root cause incompatibility: " ++ Incompatibility.toDebugString 0 incompat) ""
+                in
                 incompat :: model.incompatibilities
 
             else
