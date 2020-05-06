@@ -6,12 +6,12 @@ import Version exposing (Version)
 
 getDependencies : String -> Version -> Maybe (List ( String, Range ))
 getDependencies =
-    getDependencies4
+    getDependencies5
 
 
 listAvailableVersions : String -> List Version
 listAvailableVersions =
-    listAvailableVersions4
+    listAvailableVersions5
 
 
 
@@ -203,6 +203,121 @@ getDependencies4 package version =
             Just []
 
         ( "target", ( 1, 0, 0 ) ) ->
+            Just []
+
+        _ ->
+            Nothing
+
+
+
+-- Example 5: Linear error reporting
+-- https://github.com/dart-lang/pub/blob/master/doc/solver.md#linear-error-reporting
+
+
+listAvailableVersions5 package =
+    case package of
+        "root" ->
+            [ Version.one ]
+
+        "foo" ->
+            [ Version.one ]
+
+        "bar" ->
+            [ Version.two ]
+
+        "baz" ->
+            [ Version.one, Version.three ]
+
+        _ ->
+            []
+
+
+getDependencies5 package version =
+    case ( package, Version.toTuple version ) of
+        ( "root", ( 1, 0, 0 ) ) ->
+            Just
+                [ ( "foo", Range.between Version.one Version.two )
+                , ( "baz", Range.between Version.one Version.two )
+                ]
+
+        ( "foo", ( 1, 0, 0 ) ) ->
+            Just [ ( "bar", Range.between Version.two Version.three ) ]
+
+        ( "bar", ( 2, 0, 0 ) ) ->
+            Just [ ( "baz", Range.between Version.three (Version.new_ 4 0 0) ) ]
+
+        ( "baz", ( 1, 0, 0 ) ) ->
+            Just []
+
+        ( "baz", ( 3, 0, 0 ) ) ->
+            Just []
+
+        _ ->
+            Nothing
+
+
+
+-- Example 6: Branching error reporting
+-- https://github.com/dart-lang/pub/blob/master/doc/solver.md#branching-error-reporting
+
+
+listAvailableVersions6 package =
+    case package of
+        "root" ->
+            [ Version.one ]
+
+        "foo" ->
+            [ Version.one, Version.new_ 1 1 0 ]
+
+        "a" ->
+            [ Version.one ]
+
+        "b" ->
+            [ Version.one, Version.two ]
+
+        "x" ->
+            [ Version.one ]
+
+        "y" ->
+            [ Version.one, Version.two ]
+
+        _ ->
+            []
+
+
+getDependencies6 package version =
+    case ( package, Version.toTuple version ) of
+        ( "root", ( 1, 0, 0 ) ) ->
+            Just [ ( "foo", Range.between Version.one Version.two ) ]
+
+        ( "foo", ( 1, 0, 0 ) ) ->
+            Just
+                [ ( "a", Range.between Version.one Version.two )
+                , ( "b", Range.between Version.one Version.two )
+                ]
+
+        ( "foo", ( 1, 1, 0 ) ) ->
+            Just
+                [ ( "x", Range.between Version.one Version.two )
+                , ( "y", Range.between Version.one Version.two )
+                ]
+
+        ( "a", ( 1, 0, 0 ) ) ->
+            Just [ ( "b", Range.between Version.two Version.three ) ]
+
+        ( "b", ( 1, 0, 0 ) ) ->
+            Just []
+
+        ( "b", ( 2, 0, 0 ) ) ->
+            Just []
+
+        ( "x", ( 1, 0, 0 ) ) ->
+            Just [ ( "y", Range.between Version.two Version.three ) ]
+
+        ( "y", ( 1, 0, 0 ) ) ->
+            Just []
+
+        ( "y", ( 2, 0, 0 ) ) ->
             Just []
 
         _ ->
