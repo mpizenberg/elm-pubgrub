@@ -236,8 +236,8 @@ getDependencies5 package version =
     case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
             Just
-                [ ( "foo", Range.between Version.one Version.two )
-                , ( "baz", Range.between Version.one Version.two )
+                [ ( "baz", Range.between Version.one Version.two )
+                , ( "foo", Range.between Version.one Version.two )
                 ]
 
         ( "foo", ( 1, 0, 0 ) ) ->
