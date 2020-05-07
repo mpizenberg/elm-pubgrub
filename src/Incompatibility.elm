@@ -1,7 +1,6 @@
 module Incompatibility exposing (Incompatibility, Relation(..), asDict, fromDependencies, fromTerm, insert, merge, priorCause, relation, singlePositive, toDebugString)
 
 import Dict exposing (Dict)
-import Json.Encode
 import Range exposing (Range)
 import Term exposing (Term)
 import Version exposing (Version)
@@ -10,7 +9,13 @@ import Version exposing (Version)
 {-| Hold a dual implementation of Dict and List for efficient runtime.
 -}
 type Incompatibility
-    = Incompatibility (Dict String Term) (List ( String, Term ))
+    = Incompatibility (Dict String Term) (List ( String, Term )) Kind
+
+
+type Kind
+    = FromDependencyOf String Version
+    | DerivedFrom Incompatibility Incompatibility
+    | Unknown
 
 
 type Relation
@@ -25,26 +30,45 @@ type Relation
 
 
 asDict : Incompatibility -> Dict String Term
-asDict (Incompatibility incompat _) =
+asDict (Incompatibility incompat _ _) =
     incompat
 
 
 fromTerm : String -> Term -> Incompatibility
 fromTerm package term =
-    Incompatibility (Dict.singleton package term) [ ( package, term ) ]
+    Incompatibility (Dict.singleton package term) [ ( package, term ) ] Unknown
 
 
 
 -- Debug
 
 
-toDebugString : Int -> Incompatibility -> String
-toDebugString indentation (Incompatibility incompat _) =
-    Json.Encode.encode indentation <|
-        Json.Encode.dict
-            identity
-            (\term -> Json.Encode.string (Term.toDebugString term))
-            incompat
+toDebugString : Int -> Int -> Incompatibility -> String
+toDebugString recursiveDepth indent (Incompatibility _ list kind) =
+    case ( recursiveDepth, kind ) of
+        ( 0, _ ) ->
+            ""
+
+        ( _, FromDependencyOf package version ) ->
+            (String.repeat indent " " ++ termsString (List.reverse list))
+                ++ ("  <<<  from dependency of " ++ package ++ " at version " ++ Version.toDebugString version)
+
+        ( _, Unknown ) ->
+            String.repeat indent " " ++ termsString list ++ "  <<<  from unknown reason ..."
+
+        ( 1, DerivedFrom _ _ ) ->
+            String.repeat indent " " ++ termsString list ++ "  <<<  derived"
+
+        ( _, DerivedFrom cause1 cause2 ) ->
+            (String.repeat indent " " ++ termsString list ++ "  <<<  derived from:")
+                ++ ("\n" ++ toDebugString (recursiveDepth - 1) (indent + 3) cause1)
+                ++ ("\n" ++ toDebugString (recursiveDepth - 1) (indent + 3) cause2)
+
+
+termsString : List ( String, Term ) -> String
+termsString terms =
+    List.map (\( name, term ) -> name ++ ": " ++ Term.toDebugString term) terms
+        |> String.join ", "
 
 
 
@@ -52,7 +76,7 @@ toDebugString indentation (Incompatibility incompat _) =
 
 
 singlePositive : String -> Incompatibility -> Bool
-singlePositive package (Incompatibility _ incompat) =
+singlePositive package (Incompatibility _ incompat _) =
     case incompat of
         ( name, Term.Positive _ ) :: [] ->
             name == package
@@ -68,13 +92,21 @@ due to usage of insert here.
 fromDependencies : String -> Version -> List ( String, Range ) -> List Incompatibility
 fromDependencies package version dependencies =
     let
-        baseIncompat =
-            fromTerm package (Term.Positive (Range.exact version))
-
-        addDependency ( name, range ) accumIncompats =
-            insert name (Term.Negative range) baseIncompat :: accumIncompats
+        addDependency dep accumIncompats =
+            fromDependency package version dep :: accumIncompats
     in
     List.foldl addDependency [] dependencies
+
+
+fromDependency : String -> Version -> ( String, Range ) -> Incompatibility
+fromDependency package version ( depPackage, depRange ) =
+    let
+        term =
+            Term.Positive (Range.exact version)
+    in
+    FromDependencyOf package version
+        |> Incompatibility (Dict.singleton package term) [ ( package, term ) ]
+        |> insert depPackage (Term.Negative depRange)
 
 
 {-| Add incompatibilities obtained from dependencies in to the set of incompatibilities.
@@ -101,20 +133,20 @@ merge incompat allIncompats =
 {-| union of incompat and satisfier's cause minus terms referring to satisfier's package"
 -}
 priorCause : String -> Incompatibility -> Incompatibility -> Incompatibility
-priorCause name (Incompatibility cause _) (Incompatibility incompat _) =
-    union (Dict.remove name cause) (Dict.remove name incompat)
+priorCause name ((Incompatibility cause _ _) as i1) ((Incompatibility incompat _ _) as i2) =
+    union (Dict.remove name cause) (Dict.remove name incompat) (DerivedFrom i1 i2)
 
 
-union : Dict String Term -> Dict String Term -> Incompatibility
-union i1 i2 =
-    Dict.merge insert fuse insert i1 i2 (Incompatibility Dict.empty [])
+union : Dict String Term -> Dict String Term -> Kind -> Incompatibility
+union i1 i2 kind =
+    Dict.merge insert fuse insert i1 i2 (Incompatibility Dict.empty [] kind)
 
 
 {-| Use only if guaranted that name is not already in the incompatibility
 -}
 insert : String -> Term -> Incompatibility -> Incompatibility
-insert name term (Incompatibility dict list) =
-    Incompatibility (Dict.insert name term dict) (( name, term ) :: list)
+insert name term (Incompatibility dict list kind) =
+    Incompatibility (Dict.insert name term dict) (( name, term ) :: list) kind
 
 
 fuse : String -> Term -> Term -> Incompatibility -> Incompatibility
@@ -130,7 +162,7 @@ If S satisfies all but one of I's terms and is inconclusive for the remaining te
 we say S "almost satisfies" I and we call the remaining term the "unsatisfied term".
 -}
 relation : Incompatibility -> Dict String (List Term) -> Relation
-relation (Incompatibility _ list) set =
+relation (Incompatibility _ list _) set =
     relationStep set list Satisfies
 
 

@@ -42,7 +42,7 @@ encodeDebug { name, decisionLevel, kind } =
                 , ( "name", Json.Encode.string name )
                 , ( "decisionLevel", Json.Encode.int decisionLevel )
                 , ( "term", Json.Encode.string (Term.toDebugString term) )
-                , ( "cause", Json.Encode.string (Incompatibility.toDebugString 0 cause) )
+                , ( "cause", Json.Encode.string (Incompatibility.toDebugString 1 0 cause) )
                 ]
 
 

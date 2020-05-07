@@ -150,7 +150,7 @@ prependDecision name version (PartialSolution partial) =
         ( { decisionLevel }, memory ) :: _ ->
             let
                 _ =
-                    Debug.log ("Decision level " ++ String.fromInt decisionLevel ++ " : " ++ name ++ " : " ++ Version.toDebugString version) ""
+                    Debug.log ("Decision level " ++ String.fromInt (decisionLevel + 1) ++ " : " ++ name ++ " : " ++ Version.toDebugString version) ""
 
                 decision =
                     Assignment.newDecision name version (decisionLevel + 1)
