@@ -299,11 +299,11 @@ continueResolution incompatChanged root incompat model =
     case satisfier.kind of
         -- if satisfier.kind == Assignment.Decision || previousSatisfierLevel /= satisfier.decisionLevel then
         Assignment.Decision _ ->
-            Ok (backtrack incompatChanged previousSatisfierLevel incompat model)
+            Ok ( incompat, backtrack incompatChanged previousSatisfierLevel incompat model )
 
         Assignment.Derivation satisfierTerm { cause } ->
             if previousSatisfierLevel /= satisfier.decisionLevel then
-                Ok (backtrack incompatChanged previousSatisfierLevel incompat model)
+                Ok ( incompat, backtrack incompatChanged previousSatisfierLevel incompat model )
 
             else
                 let
@@ -335,19 +335,17 @@ continueResolution incompatChanged root incompat model =
                     conflictResolution True root priorCause model
 
 
-backtrack : Bool -> Int -> Incompatibility -> Model -> ( Incompatibility, Model )
+backtrack : Bool -> Int -> Incompatibility -> Model -> Model
 backtrack incompatChanged previousSatisfierLevel incompat model =
-    ( incompat
-    , { partialSolution = PartialSolution.dropUntilLevel previousSatisfierLevel model.partialSolution
-      , incompatibilities =
-            if incompatChanged then
-                let
-                    _ =
-                        Debug.log ("Add root cause incompatibility: " ++ Incompatibility.toDebugString 0 incompat) ""
-                in
-                incompat :: model.incompatibilities
+    { partialSolution = PartialSolution.dropUntilLevel previousSatisfierLevel model.partialSolution
+    , incompatibilities =
+        if incompatChanged then
+            let
+                _ =
+                    Debug.log ("Add root cause incompatibility: " ++ Incompatibility.toDebugString 0 incompat) ""
+            in
+            incompat :: model.incompatibilities
 
-            else
-                model.incompatibilities
-      }
-    )
+        else
+            model.incompatibilities
+    }
