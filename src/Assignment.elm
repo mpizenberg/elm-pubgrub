@@ -36,12 +36,13 @@ encodeDebug { name, decisionLevel, kind } =
                 , ( "version", Json.Encode.string (Version.toDebugString version) )
                 ]
 
-        Derivation term _ ->
+        Derivation term { cause } ->
             Json.Encode.object
                 [ ( "kind", Json.Encode.string "Derivation" )
                 , ( "name", Json.Encode.string name )
                 , ( "decisionLevel", Json.Encode.int decisionLevel )
                 , ( "term", Json.Encode.string (Term.toDebugString term) )
+                , ( "cause", Json.Encode.string (Incompatibility.toDebugString 0 cause) )
                 ]
 
 

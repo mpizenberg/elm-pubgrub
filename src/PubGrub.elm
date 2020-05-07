@@ -254,6 +254,19 @@ unitPropagationLoop root package changed loopIncompatibilities model =
 conflictResolution : Bool -> String -> Incompatibility -> Model -> Result String ( Incompatibility, Model )
 conflictResolution incompatChanged root incompat model =
     if Dict.isEmpty (Incompatibility.asDict incompat) || Incompatibility.singlePositive root incompat then
+        let
+            _ =
+                Debug.log ("Final incompatibility: " ++ Incompatibility.toDebugString 0 incompat) ""
+
+            _ =
+                Debug.log "Model incompatibilities:" ""
+
+            _ =
+                List.map (\i -> Debug.log ("  " ++ Incompatibility.toDebugString 0 i) "") model.incompatibilities
+
+            _ =
+                Debug.log ("Model partial solution:" ++ PartialSolution.toDebugString model.partialSolution) ""
+        in
         Err reportError
 
     else
