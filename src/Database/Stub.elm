@@ -6,12 +6,12 @@ import Version exposing (Version)
 
 getDependencies : String -> Version -> Maybe (List ( String, Range ))
 getDependencies =
-    getDependencies5
+    getDependencies1
 
 
 listAvailableVersions : String -> List Version
 listAvailableVersions =
-    listAvailableVersions5
+    listAvailableVersions1
 
 
 
@@ -245,6 +245,56 @@ getDependencies5 package version =
 
         ( "bar", ( 2, 0, 0 ) ) ->
             Just [ ( "baz", Range.between Version.three (Version.new_ 4 0 0) ) ]
+
+        ( "baz", ( 1, 0, 0 ) ) ->
+            Just []
+
+        ( "baz", ( 3, 0, 0 ) ) ->
+            Just []
+
+        _ ->
+            Nothing
+
+
+
+-- Example 5 (slightly modified): Linear error reporting
+-- https://github.com/dart-lang/pub/blob/master/doc/solver.md#linear-error-reporting
+
+
+listAvailableVersions5bis package =
+    case package of
+        "root" ->
+            [ Version.one ]
+
+        "foo" ->
+            [ Version.one ]
+
+        "bar" ->
+            [ Version.two, Version.new_ 2 1 0 ]
+
+        "baz" ->
+            [ Version.one, Version.three ]
+
+        _ ->
+            []
+
+
+getDependencies5bis package version =
+    case ( package, Version.toTuple version ) of
+        ( "root", ( 1, 0, 0 ) ) ->
+            Just
+                [ ( "baz", Range.between Version.one Version.two )
+                , ( "foo", Range.between Version.one Version.two )
+                ]
+
+        ( "foo", ( 1, 0, 0 ) ) ->
+            Just [ ( "bar", Range.between Version.two Version.three ) ]
+
+        ( "bar", ( 2, 0, 0 ) ) ->
+            Just [ ( "baz", Range.between Version.three (Version.new_ 4 0 0) ) ]
+
+        ( "bar", ( 2, 1, 0 ) ) ->
+            Just [ ( "baz", Range.between Version.two (Version.new_ 3 0 0) ) ]
 
         ( "baz", ( 1, 0, 0 ) ) ->
             Just []
