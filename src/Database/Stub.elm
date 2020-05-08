@@ -1,5 +1,9 @@
 module Database.Stub exposing (getDependencies, listAvailableVersions)
 
+{-| Examples dependencies for algorithm debugging purposes.
+Those should eventually be moved into unit tests.
+-}
+
 import Range exposing (Range)
 import Version exposing (Version)
 

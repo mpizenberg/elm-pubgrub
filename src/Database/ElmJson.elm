@@ -1,5 +1,10 @@
 module Database.ElmJson exposing (Packages, init)
 
+{-| Pre-loaded package dependencies for most used Elm packages.
+(NOT USED YET, I'm still in the debugging stage with handcrafted
+examples stored in Database.Stub.
+-}
+
 import Dict exposing (Dict)
 import Elm.Project exposing (Project)
 import Json.Decode

@@ -1,5 +1,10 @@
 module Database.History exposing (allPackages)
 
+{-| Pre-loaded history of all elm package versions.
+NOT USED YET, I'm still in the debugging phase,
+with handcrafted examples in Database.Stub.
+-}
+
 import Dict exposing (Dict)
 import Elm.Version exposing (Version)
 import Json.Decode exposing (Decoder)
