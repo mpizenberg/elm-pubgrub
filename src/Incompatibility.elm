@@ -1,4 +1,32 @@
-module Incompatibility exposing (Incompatibility, Relation(..), asDict, fromDependencies, fromTerm, insert, merge, priorCause, relation, singlePositive, toDebugString)
+module Incompatibility exposing
+    ( Incompatibility, asDict, fromTerm, fromDependencies, toDebugString
+    , insert, merge, priorCause
+    , Relation(..), relation
+    , singlePositive
+    )
+
+{-| An incompatibility is a set of terms that should never
+be satisfied all together.
+This module provides functions to work with incompatibilities.
+
+@docs Incompatibility, asDict, fromTerm, fromDependencies, toDebugString
+
+
+# Composition of incompatibilities
+
+@docs insert, merge, priorCause
+
+
+# Relation of satisfaction
+
+@docs Relation, relation
+
+
+# Other helper functions
+
+@docs singlePositive
+
+-}
 
 import Dict exposing (Dict)
 import Range exposing (Range)
@@ -6,18 +34,56 @@ import Term exposing (Term)
 import Version exposing (Version)
 
 
-{-| Hold a dual implementation of Dict and List for efficient runtime.
+{-| An incompatibility is a set of terms that should never
+be satisfied all together.
+
+An incompatibility usually originated from a package dependency.
+For example, if package A at version 1 depends on package B
+at version 2, you can never have both terms `A = 1`
+and `not B = 2` satisfied at the same time in a partial solution.
+This would mean that we found a solution with package A at version 1
+but not with package B at version 2.
+Yet A@1 depends on B@2 so this is not possible.
+Therefore, the set `{ A = 1, not B = 2 }` is an incompatibility.
+
+Incompatibilities can also be derived from two other incompatibilities
+during conflict resolution. More about all this in
+[PubGrub documentation](https://github.com/dart-lang/pub/blob/master/doc/solver.md#incompatibility).
+
+This type holds a dual implementation for efficient runtime.
+Both a temporally ordered list of terms,
+and an organized dictionary of packages are useful
+at different moments in the PubGrub algorithm.
+
 -}
 type Incompatibility
     = Incompatibility (Dict String Term) (List ( String, Term )) Kind
 
 
+{-| An incompatibility can originate from a package dependency
+or from the derivation of two other incompatibilities.
+
+The Unknown case here is a temporary option
+until I figure out how to get rid of this case.
+
+-}
 type Kind
     = FromDependencyOf String Version
     | DerivedFrom Incompatibility Incompatibility
     | Unknown
 
 
+{-| A Relation describes how a set of terms can be compared to an incompatibility.
+
+We say that a set of terms S satisfies an incompatibility I
+if S satisfies every term in I.
+We say that S contradicts I
+if S contradicts at least one term in I.
+If S satisfies all but one of I's terms and is inconclusive for the remaining term,
+we say S "almost satisfies" I and we call the remaining term the "unsatisfied term".
+Otherwise, we say that their relation is inconclusive.
+
+-}
 type Relation
     = Satisfies
     | AlmostSatisfies String Term
@@ -29,11 +95,15 @@ type Relation
 -- Interop
 
 
+{-| Retrieve the dictionary representation of an incompatibility.
+-}
 asDict : Incompatibility -> Dict String Term
 asDict (Incompatibility incompat _ _) =
     incompat
 
 
+{-| Create a singleton incompatibility containing a unique term.
+-}
 fromTerm : String -> Term -> Incompatibility
 fromTerm package term =
     Incompatibility (Dict.singleton package term) [ ( package, term ) ] Unknown
@@ -43,6 +113,9 @@ fromTerm package term =
 -- Debug
 
 
+{-| String representation of an incompatibility,
+for debug means.
+-}
 toDebugString : Int -> Int -> Incompatibility -> String
 toDebugString recursiveDepth indent (Incompatibility _ list kind) =
     case ( recursiveDepth, kind ) of
@@ -75,6 +148,9 @@ termsString terms =
 -- Functions
 
 
+{-| Check if an incompatibility contains a single positive term
+related to the given package.
+-}
 singlePositive : String -> Incompatibility -> Bool
 singlePositive package (Incompatibility _ incompat _) =
     case incompat of
@@ -120,6 +196,7 @@ foo 1.0.0 depends on bar ^1.0.0 and
 foo 1.1.0 depends on bar ^1.0.0
 as two separate incompatibilities,
 they're collapsed together into the single incompatibility {foo ^1.0.0, not bar ^1.0.0}
+(provided that no other version of foo exists between 1.0.0 and 2.0.0).
 
 Here we do the simple stupid thing of just growing the list.
 TODO: improve this.
@@ -130,7 +207,9 @@ merge incompat allIncompats =
     incompat :: allIncompats
 
 
-{-| union of incompat and satisfier's cause minus terms referring to satisfier's package"
+{-| A prior cause is computed as the union of
+the terms in the incompatibility and the terms in the satisfier's cause
+minus the terms referring to satisfier's package.
 -}
 priorCause : String -> Incompatibility -> Incompatibility -> Incompatibility
 priorCause name ((Incompatibility cause _ _) as i1) ((Incompatibility incompat _ _) as i2) =
@@ -142,16 +221,17 @@ union i1 i2 kind =
     Dict.merge insert fuse insert i1 i2 (Incompatibility Dict.empty [] kind)
 
 
-{-| Use only if guaranted that name is not already in the incompatibility
+fuse : String -> Term -> Term -> Incompatibility -> Incompatibility
+fuse name t1 t2 incompatibility =
+    insert name (Term.union t1 t2) incompatibility
+
+
+{-| Insert a new package term inside an incompatibility.
+Use ONLY if guaranted that the package name is not already in the incompatibility.
 -}
 insert : String -> Term -> Incompatibility -> Incompatibility
 insert name term (Incompatibility dict list kind) =
     Incompatibility (Dict.insert name term dict) (( name, term ) :: list) kind
-
-
-fuse : String -> Term -> Term -> Incompatibility -> Incompatibility
-fuse name t1 t2 incompatibility =
-    insert name (Term.union t1 t2) incompatibility
 
 
 {-| We say that a set of terms S satisfies an incompatibility I
@@ -160,6 +240,9 @@ We say that S contradicts I
 if S contradicts at least one term in I.
 If S satisfies all but one of I's terms and is inconclusive for the remaining term,
 we say S "almost satisfies" I and we call the remaining term the "unsatisfied term".
+
+TODO: reverse the Incompatibility and dict arguments order.
+
 -}
 relation : Incompatibility -> Dict String (List Term) -> Relation
 relation (Incompatibility _ list _) set =
