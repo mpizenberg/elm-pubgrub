@@ -2,17 +2,24 @@ module Database.Stub exposing (getDependencies, listAvailableVersions)
 
 {-| Examples dependencies for algorithm debugging purposes.
 Those should eventually be moved into unit tests.
+
+@docs getDependencies, listAvailableVersions
+
 -}
 
 import Range exposing (Range)
 import Version exposing (Version)
 
 
+{-| Get the list of dependencies of a given package at a given version.
+-}
 getDependencies : String -> Version -> Maybe (List ( String, Range ))
 getDependencies =
     getDependencies1
 
 
+{-| Get the list of available versions for a given package.
+-}
 listAvailableVersions : String -> List Version
 listAvailableVersions =
     listAvailableVersions1

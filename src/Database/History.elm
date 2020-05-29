@@ -3,6 +3,9 @@ module Database.History exposing (allPackages)
 {-| Pre-loaded history of all elm package versions.
 NOT USED YET, I'm still in the debugging phase,
 with handcrafted examples in Database.Stub.
+
+@docs allPackages
+
 -}
 
 import Dict exposing (Dict)
@@ -10,6 +13,8 @@ import Elm.Version exposing (Version)
 import Json.Decode exposing (Decoder)
 
 
+{-| List of all packages exisiting to this moment.
+-}
 allPackages : Dict String (List Version)
 allPackages =
     Json.Decode.decodeString rawHistoryDecoder raw

@@ -3,6 +3,9 @@ module Database.ElmJson exposing (Packages, init)
 {-| Pre-loaded package dependencies for most used Elm packages.
 (NOT USED YET, I'm still in the debugging stage with handcrafted
 examples stored in Database.Stub.
+
+@docs Packages, init
+
 -}
 
 import Dict exposing (Dict)
@@ -10,10 +13,14 @@ import Elm.Project exposing (Project)
 import Json.Decode
 
 
+{-| Representation of the whole set of packages.
+-}
 type alias Packages =
     Dict ( String, ( Int, Int, Int ) ) Project
 
 
+{-| Initial set of preloaded packages.
+-}
 init : Packages
 init =
     Dict.fromList
