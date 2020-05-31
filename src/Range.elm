@@ -1,6 +1,5 @@
 module Range exposing
-    ( Range
-    , toDebugString
+    ( Range, toDebugString
     , none, any, exact, higherThan, lowerThan, between
     , negate, intersection, union
     , contains
@@ -8,13 +7,20 @@ module Range exposing
 
 {-| Dealing with version ranges union and intersection.
 
-@docs Range
+@docs Range, toDebugString
 
-@docs toDebugString
+
+# Creation of a range selection
 
 @docs none, any, exact, higherThan, lowerThan, between
 
+
+# Set operations on ranges
+
 @docs negate, intersection, union
+
+
+# Evaluate if a range contains a given version
 
 @docs contains
 
@@ -23,10 +29,34 @@ module Range exposing
 import Version exposing (Version)
 
 
+{-| A range corresponds to any set of versions
+representable as a concatenation, union, and complement
+of version ranges building blocks.
+
+Those building blocks are:
+
+  - `none`: the empty set
+  - `any`: the set of all possible versions
+  - `exact v`: the singleton set of only version `v`
+  - `higherThan v`: the set of versions higher or equal to `v`
+  - `lowerThan v`: the set of versions strictly lower than `v`
+  - `between v1 v2`: the set of versions higher or equal
+    to `v1` and strictly lower than `v2`
+
+Internally, they are represented as an ordered list of intervals
+to have a normalized form enabling comparisons of ranges.
+
+-}
 type Range
     = Range (List Interval)
 
 
+{-| Finite or infinite interval.
+If the second element of the tuple is `Nothing`,
+this is an infinite interval of the form [v, +∞[.
+All other intervals are of the form [v1, v2[
+where the second element of the tuple is excluded.
+-}
 type alias Interval =
     ( Version, Maybe Version )
 
@@ -35,6 +65,8 @@ type alias Interval =
 -- Debug
 
 
+{-| Displayable representation of a range, for debug purposes
+-}
 toDebugString : Range -> String
 toDebugString (Range intervals) =
     case intervals of
@@ -80,26 +112,45 @@ intervalToString interval =
 -- Constructors
 
 
+{-| Empty set of versions.
+
+    none == lowerThan zero
+
+-}
 none : Range
 none =
     Range []
 
 
+{-| Set of all possible versions.
+
+    any == higherThan zero
+
+-}
 any : Range
 any =
     higherThan Version.zero
 
 
+{-| Set containing exactly one version.
+
+    exact v == intersection (higherThan v) (lowerThan <| bumpPatch v)
+
+-}
 exact : Version -> Range
 exact version =
     Range [ ( version, Just (Version.bumpPatch version) ) ]
 
 
+{-| Set of all versions higher or equal to some version.
+-}
 higherThan : Version -> Range
 higherThan version =
     Range [ ( version, Nothing ) ]
 
 
+{-| Set of all versions strictly lower than some version.
+-}
 lowerThan : Version -> Range
 lowerThan version =
     if version == Version.zero then
@@ -109,6 +160,13 @@ lowerThan version =
         Range [ ( Version.zero, Just version ) ]
 
 
+{-| Set of versions comprised between two given versions.
+The lower bound is included and the higher bound excluded.
+`v1 <= v < v2`.
+
+    between v1 v2 == intersection (higherThan v1) (lowerThan v2)
+
+-}
 between : Version -> Version -> Range
 between v1 v2 =
     if Version.higherThan v1 v2 then
@@ -122,6 +180,8 @@ between v1 v2 =
 -- Set operation: negate
 
 
+{-| Compute the complement set of versions.
+-}
 negate : Range -> Range
 negate (Range intervals) =
     cleanFirstInterval (negateHelper Version.zero [] intervals)
@@ -158,11 +218,15 @@ cleanFirstInterval intervals =
 -- Set operation: union and intersection
 
 
+{-| Compute union of two sets of versions.
+-}
 union : Range -> Range -> Range
 union r1 r2 =
     negate (intersection (negate r1) (negate r2))
 
 
+{-| Compute intersection of two sets of versions.
+-}
 intersection : Range -> Range -> Range
 intersection (Range i1) (Range i2) =
     Range (intersectionHelper [] i1 i2)
@@ -229,6 +293,8 @@ reversePrepend rev accum =
 -- Check if a version is in range
 
 
+{-| Check if a range selection contains a given version.
+-}
 contains : Version -> Range -> Bool
 contains version (Range intervals) =
     intervalsContains version intervals
