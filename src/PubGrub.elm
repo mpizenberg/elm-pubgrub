@@ -1,5 +1,30 @@
 module PubGrub exposing (solve)
 
+{-| PubGrub version solving algorithm.
+
+PubGrub is a version solving algorithm,
+written in 2018 by Natalie Weizenbaum
+for the Dart package manager.
+It is supposed to be very fast and to explain errors
+more clearly than the alternatives.
+An introductory blog post was
+[published on Medium][medium-pubgrub] by it author.
+
+The detailed explanation of the algorithm is
+[provided on GitHub][github-pubgrub].
+The foundation of the algorithm is based on ASP (Answer Set Programming)
+and a book called
+"[Answer Set Solving in Practice][potassco-book]"
+by Martin Gebser, Roland Kaminski, Benjamin Kaufmann and Torsten Schaub.
+
+[medium-pubgrub]: https://medium.com/@nex3/pubgrub-2fb6470504f
+[github-pubgrub]: https://github.com/dart-lang/pub/blob/master/doc/solver.md
+[potassco-book]: https://potassco.org/book/
+
+@docs solve
+
+-}
+
 import Assignment
 import Database.Stub as Stub
 import Dict
@@ -51,10 +76,8 @@ updatePartialSolution f { incompatibilities, partialSolution } =
     }
 
 
-
--- PubGrub algorithm
-
-
+{-| PubGrub version solving algorithm.
+-}
 solve : String -> Version -> Result String (List ( String, Version ))
 solve root version =
     solveRec root root (init root version)
