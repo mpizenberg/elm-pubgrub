@@ -8,7 +8,7 @@ for the Dart package manager.
 It is supposed to be very fast and to explain errors
 more clearly than the alternatives.
 An introductory blog post was
-[published on Medium][medium-pubgrub] by it author.
+[published on Medium][medium-pubgrub] by its author.
 
 The detailed explanation of the algorithm is
 [provided on GitHub][github-pubgrub].
