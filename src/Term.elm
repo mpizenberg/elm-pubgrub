@@ -148,8 +148,8 @@ listIntersection initial terms =
 
 {-| Check if a set of terms contradicts a given term.
 
-We say that a set of terms S "satisfies"
-a term t if t must be true whenever every term in S is true.
+We say that a set of terms S "contradicts"
+a term t if t must be false whenever every term in S is true.
 
 -}
 contradicts : Term -> List Term -> Bool
@@ -160,8 +160,8 @@ contradicts term set =
 
 {-| Check if a set of terms satisfies a given term.
 
-We say that a set of terms S "contradicts"
-a term t if t must be false whenever every term in S is true.
+We say that a set of terms S "satisfies"
+a term t if t must be true whenever every term in S is true.
 
 -}
 satisfies : Term -> List Term -> Bool
