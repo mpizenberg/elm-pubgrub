@@ -333,29 +333,49 @@ continueResolution incompatChanged root incompat model =
                     priorCause =
                         -- "priorCause is guaranted to be almost satisfied by the partial solution"
                         Incompatibility.priorCause satisfier.name cause incompat
+
+                    -- only for debugging, could be removed once code works, if removal is useful for performance reasons
+                    debugCheck =
+                        case PartialSolution.relation priorCause model.partialSolution of
+                            Incompatibility.Satisfies ->
+                                Err "priorCause relation to partialSolution is Satisfies, expected AlmostSatisfies @ PubGrub.continueResolution"
+
+                            Incompatibility.AlmostSatisfies _ _ ->
+                                Ok ()
+
+                            Incompatibility.Contradicts _ _ ->
+                                Err "priorCause relation to partialSolution is Contradicts, expected AlmostSatisfies @ PubGrub.continueResolution"
+
+                            Incompatibility.Inconclusive ->
+                                Err "priorCause relation to partialSolution is Inconclusive, expected AlmostSatisfies @ PubGrub.continueResolution"
                 in
-                -- if satisfier does not satisfy term
-                if not (Term.satisfies term [ satisfierTerm ]) then
-                    -- add `not (satisfier \ term)` to priorCause. Then set incompat to priorCause
-                    -- satisfier \ term  ===  intersection satisfier (not term)
-                    -- not (...)  ===  union (not satisfier) (term)
-                    let
-                        derived =
-                            Term.union term (Term.negate satisfierTerm)
+                case debugCheck of
+                    Err error ->
+                        Err error
 
-                        newIncompat =
-                            -- priorCause is guaranted to not contain satisfier.name
-                            -- so we can safely insert the derived term.
-                            Incompatibility.insert satisfier.name derived priorCause
-                    in
-                    -- set incompat to newIncompat
-                    -- TODO: tail rec
-                    conflictResolution True root newIncompat model
+                    Ok () ->
+                        -- if satisfier does not satisfy term
+                        if not (Term.satisfies term [ satisfierTerm ]) then
+                            -- add `not (satisfier \ term)` to priorCause. Then set incompat to priorCause
+                            -- satisfier \ term  ===  intersection satisfier (not term)
+                            -- not (...)  ===  union (not satisfier) (term)
+                            let
+                                derived =
+                                    Term.union term (Term.negate satisfierTerm)
 
-                else
-                    -- set incompat to priorCause
-                    -- TODO: tail rec
-                    conflictResolution True root priorCause model
+                                newIncompat =
+                                    -- priorCause is guaranted to not contain satisfier.name
+                                    -- so we can safely insert the derived term.
+                                    Incompatibility.insert satisfier.name derived priorCause
+                            in
+                            -- set incompat to newIncompat
+                            -- TODO: tail rec
+                            conflictResolution True root newIncompat model
+
+                        else
+                            -- set incompat to priorCause
+                            -- TODO: tail rec
+                            conflictResolution True root priorCause model
 
 
 backtrack : Bool -> Int -> Incompatibility -> Model -> Model
