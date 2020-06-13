@@ -201,18 +201,7 @@ the union is a positive term.
 -}
 union : Term -> Term -> Term
 union t1 t2 =
-    case ( t1, t2 ) of
-        ( Positive r1, Positive r2 ) ->
-            Positive (Range.union r1 r2)
-
-        ( Positive r1, Negative r2 ) ->
-            Positive (Range.union r1 (Range.negate r2))
-
-        ( Negative r1, Positive r2 ) ->
-            Positive (Range.union (Range.negate r1) r2)
-
-        ( Negative r1, Negative r2 ) ->
-            Negative (Range.intersection r1 r2)
+    negate (intersection (negate t1) (negate t2))
 
 
 {-| Evaluate a term regarding a given choice
