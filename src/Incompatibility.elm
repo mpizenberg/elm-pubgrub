@@ -55,6 +55,16 @@ Both a temporally ordered list of terms,
 and an organized dictionary of packages are useful
 at different moments in the PubGrub algorithm.
 
+TODO: Derived incompat with more than one term and has a positive term
+referring to root and containing initial version:
+Pub is normalizing those by removing the root package
+which will always be satisfied.
+
+TODO: Maybe the unknown kind should be extracted into
+an Incompatibility variant NoVersion.
+And the FromDependencyOf and DerivedFrom would be sub variants
+of an IncompatibilityTree variant.
+
 -}
 type Incompatibility
     = Incompatibility (Dict String Term) (List ( String, Term )) Kind
@@ -210,12 +220,18 @@ merge incompat allIncompats =
 {-| A prior cause is computed as the union of
 the terms in the incompatibility and the terms in the satisfier's cause
 minus the terms referring to satisfier's package.
+
+TODO: If an incompatibility at least is of the kind Unknown (there is no version)
+this needs special treatment.
+
 -}
 priorCause : String -> Incompatibility -> Incompatibility -> Incompatibility
 priorCause name ((Incompatibility cause _ _) as i1) ((Incompatibility incompat _ _) as i2) =
     union (Dict.remove name cause) (Dict.remove name incompat) (DerivedFrom i1 i2)
 
 
+{-| Union of all terms in two incompatibilities.
+-}
 union : Dict String Term -> Dict String Term -> Kind -> Incompatibility
 union i1 i2 kind =
     Dict.merge insert fuse insert i1 i2 (Incompatibility Dict.empty [] kind)
@@ -223,6 +239,13 @@ union i1 i2 kind =
 
 fuse : String -> Term -> Term -> Incompatibility -> Incompatibility
 fuse name t1 t2 incompatibility =
+    -- TODO: actually maybe we should do the general thing
+    -- consisting of removing t1 U t2 from merged prior cause incompat
+    -- if not t2 is included in t1?
+    -- Since this will always be satisfied anyway.
+    -- Does this corresponds to `not none` as result of terms union?
+    -- That is satisfied if no version is picked or if a version
+    -- is picked that is anything.
     insert name (Term.union t1 t2) incompatibility
 
 
