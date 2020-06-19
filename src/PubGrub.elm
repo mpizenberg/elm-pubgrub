@@ -240,6 +240,7 @@ unitPropagationLoop root package changed loopIncompatibilities model =
                             Err msg ->
                                 Err msg
 
+                            -- TODO: rename priorCause into rootCause
                             Ok ( priorCause, updatedModel ) ->
                                 -- priorCause is guaranted to be almost satisfied by the partial solution
                                 case PartialSolution.relation priorCause updatedModel.partialSolution of
@@ -336,10 +337,37 @@ continueResolution incompatChanged root incompat model =
 
         Assignment.Derivation satisfierTerm { cause } ->
             if previousSatisfierLevel /= satisfier.decisionLevel then
+                -- TODO: this is the case that produces the problematic incompatibility in 5bis
+                -- { bar 2 <= v < 3, baz not (none) }
+                -- Whereas baz not (none) is always satisfied.
+                -- It is satisfied if no baz is selected or if any baz is selected.
+                -- So this incompatibility should just be { bar 2 <= v < 3 }.
+                -- Otherwise the "not (none)" propagates until it becomes the incompatibility
+                -- { root, something not (none) }
+                -- which is not identified as a terminal case but should be.
+                let
+                    _ =
+                        Debug.log "previousLevel /= satisfierLevel" ""
+
+                    _ =
+                        Debug.log (Incompatibility.toDebugString -1 3 incompat) ""
+                in
                 Ok ( incompat, backtrack incompatChanged previousSatisfierLevel incompat model )
 
             else
                 let
+                    _ =
+                        Debug.log "previousLevel == satisfierLevel" ""
+
+                    _ =
+                        Debug.log ("   satisfier " ++ satisfier.name ++ " " ++ Term.toDebugString satisfierTerm) ""
+
+                    _ =
+                        Debug.log ("   cause\n" ++ Incompatibility.toDebugString -1 6 cause) ""
+
+                    _ =
+                        Debug.log ("   incompat\n" ++ Incompatibility.toDebugString -1 6 incompat) ""
+
                     priorCause =
                         Incompatibility.priorCause satisfier.name cause incompat
                 in
@@ -356,6 +384,9 @@ continueResolution incompatChanged root incompat model =
                             -- priorCause is guaranted to not contain satisfier.name
                             -- so we can safely insert the derived term.
                             Incompatibility.insert satisfier.name derived priorCause
+
+                        _ =
+                            Debug.log ("   priorCause\n" ++ Incompatibility.toDebugString -1 3 newIncompat) ""
                     in
                     -- set incompat to newIncompat
                     -- TODO: tail rec
@@ -364,6 +395,10 @@ continueResolution incompatChanged root incompat model =
                 else
                     -- set incompat to priorCause
                     -- TODO: tail rec
+                    let
+                        _ =
+                            Debug.log ("   priorCause\n" ++ Incompatibility.toDebugString -1 3 priorCause) ""
+                    in
                     conflictResolution True root priorCause model
 
 
