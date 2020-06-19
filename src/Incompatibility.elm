@@ -246,7 +246,15 @@ fuse name t1 t2 incompatibility =
     -- Does this corresponds to `not none` as result of terms union?
     -- That is satisfied if no version is picked or if a version
     -- is picked that is anything.
-    insert name (Term.union t1 t2) incompatibility
+    let
+        termUnion =
+            Term.union t1 t2
+    in
+    if termUnion == Term.Negative Range.none then
+        incompatibility
+
+    else
+        insert name termUnion incompatibility
 
 
 {-| Insert a new package term inside an incompatibility.
