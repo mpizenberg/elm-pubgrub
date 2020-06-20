@@ -218,13 +218,13 @@ prependDecision name version (PartialSolution partial) =
                     Assignment.newDecision name version (decisionLevel + 1)
 
                 newMemory =
-                    Dict.update name (updateMemoryVersion version) memory
+                    Dict.update name (updateMemoryDecision version) memory
             in
             PartialSolution (( decision, newMemory ) :: partial)
 
 
-updateMemoryVersion : Version -> Maybe PackageMemory -> Maybe PackageMemory
-updateMemoryVersion version maybe =
+updateMemoryDecision : Version -> Maybe PackageMemory -> Maybe PackageMemory
+updateMemoryDecision version maybe =
     case maybe of
         Nothing ->
             Just { decision = Just version, derivations = [] }
@@ -260,13 +260,13 @@ prependDerivation name term cause (PartialSolution partial) =
                     Assignment.newDerivation name term decisionLevel cause
 
                 newMemory =
-                    Dict.update name (updateMemoryTerm term) memory
+                    Dict.update name (updateMemoryDerivations term) memory
             in
             PartialSolution (( derivation, newMemory ) :: partial)
 
 
-updateMemoryTerm : Term -> Maybe PackageMemory -> Maybe PackageMemory
-updateMemoryTerm term maybe =
+updateMemoryDerivations : Term -> Maybe PackageMemory -> Maybe PackageMemory
+updateMemoryDerivations term maybe =
     case maybe of
         Nothing ->
             Just { decision = Nothing, derivations = [ term ] }
@@ -330,10 +330,10 @@ addAssignment : Assignment -> Memory -> Memory
 addAssignment assignment memory =
     case assignment.kind of
         Assignment.Decision version ->
-            Dict.update assignment.name (updateMemoryVersion version) memory
+            Dict.update assignment.name (updateMemoryDecision version) memory
 
         Assignment.Derivation term _ ->
-            Dict.update assignment.name (updateMemoryTerm term) memory
+            Dict.update assignment.name (updateMemoryDerivations term) memory
 
 
 searchSatisfier : Incompatibility -> (Assignment -> Memory -> Memory) -> { left : Int, right : Int } -> ( Assignment, Memory ) -> List ( Assignment, Memory ) -> SearchDecision ( Assignment, PartialSolution, Term )
