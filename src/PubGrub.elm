@@ -411,8 +411,7 @@ backtrack incompatChanged previousSatisfierLevel incompat model =
                 _ =
                     Debug.log ("Add root cause incompatibility:\n" ++ Incompatibility.toDebugString -1 3 incompat) ""
             in
-            -- TODO: Use incompatibility.merge
-            incompat :: model.incompatibilities
+            Incompatibility.merge incompat model.incompatibilities
 
         else
             model.incompatibilities
