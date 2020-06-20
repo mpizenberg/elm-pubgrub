@@ -30,6 +30,8 @@ or (2) a derivation, which is a `Term` specifying compatible versions.
 A `decisionLevel` records how many decisions have already been taken,
 including this one if it is a decision.
 
+TODO: rename "name" into "package"
+
 -}
 type alias Assignment =
     { name : String
