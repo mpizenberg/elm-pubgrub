@@ -177,8 +177,13 @@ Probably because I need a Dict for Incompatibility.relation ...
 
 -}
 relation : Incompatibility -> PartialSolution -> Relation
-relation incompatibility partial =
-    Incompatibility.relation (Dict.map memoryTerms (firstMemory partial)) incompatibility
+relation incompatibility (PartialSolution partial) =
+    case partial of
+        [] ->
+            Incompatibility.relation Dict.empty incompatibility
+
+        ( _, memory ) :: _ ->
+            Incompatibility.relation (Dict.map memoryTerms memory) incompatibility
 
 
 memoryTerms : a -> PackageMemory -> List Term
@@ -189,13 +194,6 @@ memoryTerms _ { decision, derivations } =
 
         Just version ->
             Term.Positive (Range.exact version) :: derivations
-
-
-firstMemory : PartialSolution -> Memory
-firstMemory (PartialSolution partial) =
-    List.head partial
-        |> Maybe.map Tuple.second
-        |> Maybe.withDefault Dict.empty
 
 
 {-| Prepend a decision (a package with a version)
