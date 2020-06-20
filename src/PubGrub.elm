@@ -404,7 +404,7 @@ continueResolution incompatChanged root incompat model =
 
 backtrack : Bool -> Int -> Incompatibility -> Model -> Model
 backtrack incompatChanged previousSatisfierLevel incompat model =
-    { partialSolution = PartialSolution.dropUntilLevel previousSatisfierLevel model.partialSolution
+    { partialSolution = PartialSolution.backtrack previousSatisfierLevel model.partialSolution
     , incompatibilities =
         if incompatChanged then
             let

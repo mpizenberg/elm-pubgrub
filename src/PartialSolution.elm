@@ -1,7 +1,7 @@
 module PartialSolution exposing
     ( PartialSolution, empty, toDebugString
     , solution
-    , prependDecision, prependDerivation, dropUntilLevel
+    , prependDecision, prependDerivation, backtrack
     , potentialPackages, addVersion, relation
     , findSatisfier, findPreviousSatisfier
     )
@@ -19,7 +19,7 @@ This module provides functions to manage it.
 
 # Building and backtracking a partial solution
 
-@docs prependDecision, prependDerivation, dropUntilLevel
+@docs prependDecision, prependDerivation, backtrack
 
 
 # Choosing a new package
@@ -277,25 +277,23 @@ updateMemoryDerivations term maybe =
 
 {-| Backtrack the partial solution to a given decision level.
 -}
-dropUntilLevel : Int -> PartialSolution -> PartialSolution
-dropUntilLevel level (PartialSolution partial) =
+backtrack : Int -> PartialSolution -> PartialSolution
+backtrack level (PartialSolution partial) =
+    PartialSolution (dropUntilLevel level partial)
+
+
+dropUntilLevel : Int -> List ( Assignment, m ) -> List ( Assignment, m )
+dropUntilLevel level partial =
     case partial of
         [] ->
-            empty
+            []
 
         ( { decisionLevel }, _ ) :: others ->
             if decisionLevel > level then
-                dropUntilLevel level (PartialSolution others)
+                dropUntilLevel level others
 
             else
-                let
-                    debugString =
-                        toDebugString (PartialSolution partial)
-
-                    _ =
-                        Debug.log ("Backtrack partial solution to:\n" ++ debugString) ""
-                in
-                PartialSolution partial
+                partial
 
 
 {-| A satisfier is the earliest assignment in partial solution such that the incompatibility
