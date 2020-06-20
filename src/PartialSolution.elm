@@ -125,16 +125,11 @@ potentialPackages (PartialSolution partial) =
 
 potentialPackage : String -> { decision : Maybe Version, derivations : List Term } -> Maybe (List Term)
 potentialPackage _ { decision, derivations } =
-    case decision of
-        Just _ ->
-            Nothing
+    if decision == Nothing && List.any Term.isPositive derivations then
+        Just derivations
 
-        Nothing ->
-            if List.any Term.isPositive derivations then
-                Just derivations
-
-            else
-                Nothing
+    else
+        Nothing
 
 
 {-| We can add the version to the partial solution as a decision
