@@ -166,7 +166,7 @@ doesNotSatisfy newIncompatibilities (PartialSolution partial) =
             True
 
         ( incompat :: others, ( _, memory ) :: _ ) ->
-            case Incompatibility.relation incompat (Dict.map memoryTerms memory) of
+            case Incompatibility.relation (Dict.map memoryTerms memory) incompat of
                 Incompatibility.Satisfies ->
                     False
 
@@ -183,7 +183,7 @@ Probably because I need a Dict for Incompatibility.relation ...
 -}
 relation : Incompatibility -> PartialSolution -> Relation
 relation incompatibility partial =
-    Incompatibility.relation incompatibility (Dict.map memoryTerms (firstMemory partial))
+    Incompatibility.relation (Dict.map memoryTerms (firstMemory partial)) incompatibility
 
 
 memoryTerms : a -> PackageMemory -> List Term
@@ -354,7 +354,7 @@ searchSatisfier incompat buildMemory { left, right } ( assignment, _ ) earlier =
         memory =
             buildMemory assignment earlierMemory
     in
-    case Incompatibility.relation incompat (Dict.map memoryTerms memory) of
+    case Incompatibility.relation (Dict.map memoryTerms memory) incompat of
         -- if it satisfies, search right (earlier assignments)
         Incompatibility.Satisfies ->
             if right == 0 then

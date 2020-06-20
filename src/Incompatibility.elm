@@ -271,12 +271,9 @@ We say that S contradicts I
 if S contradicts at least one term in I.
 If S satisfies all but one of I's terms and is inconclusive for the remaining term,
 we say S "almost satisfies" I and we call the remaining term the "unsatisfied term".
-
-TODO: reverse the Incompatibility and dict arguments order.
-
 -}
-relation : Incompatibility -> Dict String (List Term) -> Relation
-relation (Incompatibility _ list _) set =
+relation : Dict String (List Term) -> Incompatibility -> Relation
+relation set (Incompatibility _ list _) =
     relationStep set list Satisfies
 
 
