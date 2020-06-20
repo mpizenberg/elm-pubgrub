@@ -8,7 +8,6 @@
         "Assignment",
         "Database.ElmJson",
         "Database.History",
-        "Derivation",
         "Incompatibility",
         "PartialSolution",
         "PubGrub",
