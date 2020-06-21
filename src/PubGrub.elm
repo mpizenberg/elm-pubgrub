@@ -62,8 +62,8 @@ mapIncompatibilities f { incompatibilities, partialSolution } =
     }
 
 
-updatePartialSolution : (PartialSolution -> PartialSolution) -> Model -> Model
-updatePartialSolution f { incompatibilities, partialSolution } =
+mapPartialSolution : (PartialSolution -> PartialSolution) -> Model -> Model
+mapPartialSolution f { incompatibilities, partialSolution } =
     { incompatibilities = incompatibilities
     , partialSolution = f partialSolution
     }
@@ -241,7 +241,7 @@ unitPropagationLoop root package changed loopIncompatibilities model =
                                         let
                                             -- add (not term) to partial solution with incompat as cause
                                             updatedAgainModel =
-                                                updatePartialSolution (PartialSolution.prependDerivation name (Term.negate term) priorCause) updatedModel
+                                                mapPartialSolution (PartialSolution.prependDerivation name (Term.negate term) priorCause) updatedModel
                                         in
                                         -- Replace changed with a set containing only term's package name.
                                         -- Would love to use the |> syntax if it would not break tail call optimization (TCO).
@@ -254,7 +254,7 @@ unitPropagationLoop root package changed loopIncompatibilities model =
                         let
                             updatedModel =
                                 -- derivation :: partial
-                                updatePartialSolution (PartialSolution.prependDerivation name (Term.negate term) incompat) model
+                                mapPartialSolution (PartialSolution.prependDerivation name (Term.negate term) incompat) model
                         in
                         -- Would love to use the |> syntax if it didn't break TCO.
                         unitPropagationLoop root package (name :: changed) othersIncompat updatedModel
