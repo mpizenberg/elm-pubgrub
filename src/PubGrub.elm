@@ -55,8 +55,8 @@ setIncompatibilities incompatibilities model =
     }
 
 
-updateIncompatibilities : (List Incompatibility -> List Incompatibility) -> Model -> Model
-updateIncompatibilities f { incompatibilities, partialSolution } =
+mapIncompatibilities : (List Incompatibility -> List Incompatibility) -> Model -> Model
+mapIncompatibilities f { incompatibilities, partialSolution } =
     { incompatibilities = f incompatibilities
     , partialSolution = partialSolution
     }
@@ -99,7 +99,7 @@ makeDecision listAvailableVersions model =
             Nothing
 
         Just (Err ( name, incompat )) ->
-            Just ( name, updateIncompatibilities (Incompatibility.merge incompat) model )
+            Just ( name, mapIncompatibilities (Incompatibility.merge incompat) model )
 
         Just (Ok ( name, version )) ->
             let
