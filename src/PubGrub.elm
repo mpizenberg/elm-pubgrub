@@ -233,22 +233,21 @@ unitPropagationLoop root package changed loopIncompatibilities model =
                             Err msg ->
                                 Err msg
 
-                            -- TODO: rename priorCause into rootCause
-                            Ok ( priorCause, updatedModel ) ->
-                                -- priorCause is guaranted to be almost satisfied by the partial solution
-                                case PartialSolution.relation priorCause updatedModel.partialSolution of
+                            Ok ( rootCause, updatedModel ) ->
+                                -- rootCause is guaranted to be almost satisfied by the partial solution
+                                case PartialSolution.relation rootCause updatedModel.partialSolution of
                                     Incompatibility.AlmostSatisfies name term ->
                                         let
                                             -- add (not term) to partial solution with incompat as cause
                                             updatedAgainModel =
-                                                mapPartialSolution (PartialSolution.prependDerivation name (Term.negate term) priorCause) updatedModel
+                                                mapPartialSolution (PartialSolution.prependDerivation name (Term.negate term) rootCause) updatedModel
                                         in
                                         -- Replace changed with a set containing only term's package name.
                                         -- Would love to use the |> syntax if it would not break tail call optimization (TCO).
                                         unitPropagationLoop root package [ name ] othersIncompat updatedAgainModel
 
                                     _ ->
-                                        Err "This should never happen, priorCause is guaranted to be almost satisfied by the partial solution"
+                                        Err "This should never happen, rootCause is guaranted to be almost satisfied by the partial solution"
 
                     Incompatibility.AlmostSatisfies name term ->
                         let
