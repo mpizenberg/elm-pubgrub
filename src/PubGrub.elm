@@ -98,24 +98,24 @@ makeDecision listAvailableVersions model =
         Nothing ->
             Nothing
 
-        Just (Err ( name, incompat )) ->
-            Just ( name, mapIncompatibilities (Incompatibility.merge incompat) model )
+        Just (Err ( package, incompat )) ->
+            Just ( package, mapIncompatibilities (Incompatibility.merge incompat) model )
 
-        Just (Ok ( name, version )) ->
+        Just (Ok ( package, version )) ->
             let
                 dependencies =
-                    case Stub.getDependencies name version of
+                    case Stub.getDependencies package version of
                         Just deps ->
                             deps
 
                         Nothing ->
-                            Debug.todo "The name and version should exist"
+                            Debug.todo "The package and version should exist"
 
                 depIncompats =
-                    Incompatibility.fromDependencies name version dependencies
+                    Incompatibility.fromDependencies package version dependencies
 
                 _ =
-                    Debug.log ("Add the following " ++ String.fromInt (List.length depIncompats) ++ " incompatibilities from dependencies of " ++ name) ""
+                    Debug.log ("Add the following " ++ String.fromInt (List.length depIncompats) ++ " incompatibilities from dependencies of " ++ package) ""
 
                 _ =
                     depIncompats
@@ -124,12 +124,12 @@ makeDecision listAvailableVersions model =
                 updatedIncompatibilities =
                     List.foldr Incompatibility.merge model.incompatibilities depIncompats
             in
-            case PartialSolution.addVersion name version depIncompats model.partialSolution of
+            case PartialSolution.addVersion package version depIncompats model.partialSolution of
                 Nothing ->
-                    Just ( name, setIncompatibilities updatedIncompatibilities model )
+                    Just ( package, setIncompatibilities updatedIncompatibilities model )
 
                 Just updatedPartial ->
-                    Just ( name, Model updatedIncompatibilities updatedPartial )
+                    Just ( package, Model updatedIncompatibilities updatedPartial )
 
 
 {-| Heuristic to pick the next package & version to add to the partial solution.
@@ -151,10 +151,10 @@ the package name and the incompatibity {term}.
 pickPackageVersion : PartialSolution -> (String -> List Version) -> Maybe (Result ( String, Incompatibility ) ( String, Version ))
 pickPackageVersion partial listAvailableVersions =
     case pickPackage partial of
-        Just ( name, term ) ->
-            pickVersion (listAvailableVersions name) term
-                |> Maybe.map (Tuple.pair name)
-                |> Result.fromMaybe ( name, Incompatibility.fromTerm name term )
+        Just ( package, term ) ->
+            pickVersion (listAvailableVersions package) term
+                |> Maybe.map (Tuple.pair package)
+                |> Result.fromMaybe ( package, Incompatibility.fromTerm package term )
                 |> Just
 
         Nothing ->
@@ -352,7 +352,7 @@ continueResolution incompatChanged root incompat model =
                         Debug.log "previousLevel == satisfierLevel" ""
 
                     _ =
-                        Debug.log ("   satisfier " ++ satisfier.name ++ " " ++ Term.toDebugString satisfierTerm) ""
+                        Debug.log ("   satisfier " ++ satisfier.package ++ " " ++ Term.toDebugString satisfierTerm) ""
 
                     _ =
                         Debug.log ("   cause\n" ++ Incompatibility.toDebugString -1 6 cause) ""
@@ -361,7 +361,7 @@ continueResolution incompatChanged root incompat model =
                         Debug.log ("   incompat\n" ++ Incompatibility.toDebugString -1 6 incompat) ""
 
                     priorCause =
-                        Incompatibility.priorCause satisfier.name cause incompat
+                        Incompatibility.priorCause satisfier.package cause incompat
                 in
                 -- if satisfier does not satisfy term
                 if not (Term.satisfies term [ satisfierTerm ]) then
@@ -373,9 +373,9 @@ continueResolution incompatChanged root incompat model =
                             Term.union term (Term.negate satisfierTerm)
 
                         newIncompat =
-                            -- priorCause is guaranted to not contain satisfier.name
+                            -- priorCause is guaranted to not contain satisfier.package
                             -- so we can safely insert the derived term.
-                            Incompatibility.insert satisfier.name derived priorCause
+                            Incompatibility.insert satisfier.package derived priorCause
 
                         _ =
                             Debug.log ("   priorCause\n" ++ Incompatibility.toDebugString -1 3 newIncompat) ""

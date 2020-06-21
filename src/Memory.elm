@@ -97,10 +97,10 @@ addAssignment : Assignment -> Memory -> Memory
 addAssignment assignment memory =
     case assignment.kind of
         Assignment.Decision version ->
-            addDecision assignment.name version memory
+            addDecision assignment.package version memory
 
         Assignment.Derivation term _ ->
-            addDerivation assignment.name term memory
+            addDerivation assignment.package term memory
 
 
 {-| Add a decision to a Memory.

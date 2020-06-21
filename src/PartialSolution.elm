@@ -111,10 +111,10 @@ In practice I think it can only produce a conflict if one of the dependencies
 is already in the partial solution with an incompatible version.
 -}
 addVersion : String -> Version -> List Incompatibility -> PartialSolution -> Maybe PartialSolution
-addVersion name version newIncompatibilities partial =
+addVersion package version newIncompatibilities partial =
     let
         updatedPartial =
-            prependDecision name version partial
+            prependDecision package version partial
     in
     if doesNotSatisfy newIncompatibilities updatedPartial then
         Just updatedPartial
@@ -158,25 +158,25 @@ relation incompatibility (PartialSolution partial) =
 to the partial solution.
 -}
 prependDecision : String -> Version -> PartialSolution -> PartialSolution
-prependDecision name version (PartialSolution partial) =
+prependDecision package version (PartialSolution partial) =
     case partial of
         [] ->
             PartialSolution
-                [ ( Assignment.newDecision name version 0
-                  , Dict.singleton name { decision = Just version, derivations = [] }
+                [ ( Assignment.newDecision package version 0
+                  , Dict.singleton package { decision = Just version, derivations = [] }
                   )
                 ]
 
         ( { decisionLevel }, memory ) :: _ ->
             let
                 _ =
-                    Debug.log ("Decision level " ++ String.fromInt (decisionLevel + 1) ++ " : " ++ name ++ " : " ++ Version.toDebugString version) ""
+                    Debug.log ("Decision level " ++ String.fromInt (decisionLevel + 1) ++ " : " ++ package ++ " : " ++ Version.toDebugString version) ""
 
                 decision =
-                    Assignment.newDecision name version (decisionLevel + 1)
+                    Assignment.newDecision package version (decisionLevel + 1)
 
                 newMemory =
-                    Memory.addDecision name version memory
+                    Memory.addDecision package version memory
             in
             PartialSolution (( decision, newMemory ) :: partial)
 
@@ -185,25 +185,25 @@ prependDecision name version (PartialSolution partial) =
 Also includes its cause.
 -}
 prependDerivation : String -> Term -> Incompatibility -> PartialSolution -> PartialSolution
-prependDerivation name term cause (PartialSolution partial) =
+prependDerivation package term cause (PartialSolution partial) =
     case partial of
         [] ->
             PartialSolution
-                [ ( Assignment.newDerivation name term 0 cause
-                  , Dict.singleton name { decision = Nothing, derivations = [ term ] }
+                [ ( Assignment.newDerivation package term 0 cause
+                  , Dict.singleton package { decision = Nothing, derivations = [ term ] }
                   )
                 ]
 
         ( { decisionLevel }, memory ) :: _ ->
             let
                 _ =
-                    Debug.log ("Derivation : " ++ name ++ " : " ++ Term.toDebugString term) ""
+                    Debug.log ("Derivation : " ++ package ++ " : " ++ Term.toDebugString term) ""
 
                 derivation =
-                    Assignment.newDerivation name term decisionLevel cause
+                    Assignment.newDerivation package term decisionLevel cause
 
                 newMemory =
-                    Memory.addDerivation name term memory
+                    Memory.addDerivation package term memory
             in
             PartialSolution (( derivation, newMemory ) :: partial)
 
@@ -272,7 +272,7 @@ searchSatisfier incompat buildMemory { left, right } ( assignment, _ ) earlier =
         -- if it satisfies, search right (earlier assignments)
         Incompatibility.Satisfies ->
             if right == 0 then
-                case Dict.get assignment.name (Incompatibility.asDict incompat) of
+                case Dict.get assignment.package (Incompatibility.asDict incompat) of
                     Just term ->
                         Found
                             ( assignment
