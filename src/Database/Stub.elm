@@ -15,14 +15,14 @@ import Version exposing (Version)
 -}
 getDependencies : String -> Version -> Maybe (List ( String, Range ))
 getDependencies =
-    getDependencies1
+    getDependencies7
 
 
 {-| Get the list of available versions for a given package.
 -}
 listAvailableVersions : String -> List Version
 listAvailableVersions =
-    listAvailableVersions1
+    listAvailableVersions7
 
 
 
@@ -383,3 +383,48 @@ getDependencies6 package version =
 
         _ ->
             Nothing
+
+
+
+-- Example 7: transitive dependency to incompatible root
+
+
+getDependencies7 package version =
+    case ( package, Version.toTuple version ) of
+        ( "root", ( 1, 0, 0 ) ) ->
+            Just [ ( "bar", Range.higherThan Version.one ) ]
+
+        ( "root", ( 2, 0, 0 ) ) ->
+            Just []
+
+        ( "bar", ( 1, 0, 0 ) ) ->
+            Just [ ( "foo", Range.higherThan Version.one ) ]
+
+        ( "bar", ( 2, 0, 0 ) ) ->
+            Just [ ( "foo", Range.higherThan Version.two ) ]
+
+        ( "foo", ( 1, 0, 0 ) ) ->
+            Just []
+
+        ( "foo", ( 2, 0, 0 ) ) ->
+            Just [ ( "root", Range.higherThan Version.two ) ]
+
+        _ ->
+            Nothing
+
+
+listAvailableVersions7 package =
+    case package of
+        "root" ->
+            [ Version.one, Version.two ]
+
+        "bar" ->
+            [ Version.one, Version.two ]
+                |> List.reverse
+
+        "foo" ->
+            [ Version.one, Version.two ]
+                |> List.reverse
+
+        _ ->
+            []
