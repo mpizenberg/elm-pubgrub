@@ -252,10 +252,6 @@ merge incompat allIncompats =
 {-| A prior cause is computed as the union of
 the terms in the incompatibility and the terms in the satisfier's cause
 minus the terms referring to satisfier's package.
-
-TODO: If an incompatibility at least is of the kind Unknown (there is no version)
-this needs special treatment.
-
 -}
 priorCause : String -> Incompatibility -> Incompatibility -> Incompatibility
 priorCause package ((Incompatibility cause k1) as i1) ((Incompatibility incompat k2) as i2) =
