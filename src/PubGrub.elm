@@ -287,68 +287,60 @@ conflictResolution incompatChanged root incompat model =
         Err reportError
 
     else
-        -- TODO: tail rec
-        continueResolution incompatChanged root incompat model
+        let
+            ( satisfier, earlierPartial, term ) =
+                PartialSolution.findSatisfier incompat model.partialSolution
+
+            maybePreviousSatisfier =
+                PartialSolution.findPreviousSatisfier satisfier incompat earlierPartial
+
+            previousSatisfierLevel =
+                Maybe.map (\( a, _, _ ) -> a.decisionLevel) maybePreviousSatisfier
+                    |> Maybe.map (max 1)
+                    |> Maybe.withDefault 1
+        in
+        case satisfier.kind of
+            -- if satisfier.kind == Assignment.Decision || previousSatisfierLevel /= satisfier.decisionLevel then
+            Assignment.Decision _ ->
+                Ok ( incompat, backtrack incompatChanged previousSatisfierLevel incompat model )
+
+            Assignment.Derivation satisfierTerm { cause } ->
+                if previousSatisfierLevel /= satisfier.decisionLevel then
+                    let
+                        _ =
+                            Debug.log "previousLevel /= satisfierLevel" ""
+
+                        _ =
+                            Debug.log (Incompatibility.toDebugString -1 3 incompat) ""
+                    in
+                    Ok ( incompat, backtrack incompatChanged previousSatisfierLevel incompat model )
+
+                else
+                    let
+                        _ =
+                            Debug.log "previousLevel == satisfierLevel" ""
+
+                        _ =
+                            Debug.log ("   satisfier " ++ satisfier.package ++ " " ++ Term.toDebugString satisfierTerm) ""
+
+                        _ =
+                            Debug.log ("   cause\n" ++ Incompatibility.toDebugString -1 6 cause) ""
+
+                        _ =
+                            Debug.log ("   incompat\n" ++ Incompatibility.toDebugString -1 6 incompat) ""
+
+                        priorCause =
+                            Incompatibility.priorCause cause incompat
+
+                        _ =
+                            Debug.log ("   priorCause\n" ++ Incompatibility.toDebugString -1 3 priorCause) ""
+                    in
+                    conflictResolution True root priorCause model
 
 
 reportError : String
 reportError =
     "The root package can't be selected, version solving has failed"
-
-
-continueResolution : Bool -> String -> Incompatibility -> Model -> Result String ( Incompatibility, Model )
-continueResolution incompatChanged root incompat model =
-    let
-        ( satisfier, earlierPartial, term ) =
-            PartialSolution.findSatisfier incompat model.partialSolution
-
-        maybePreviousSatisfier =
-            PartialSolution.findPreviousSatisfier satisfier incompat earlierPartial
-
-        previousSatisfierLevel =
-            Maybe.map (\( a, _, _ ) -> a.decisionLevel) maybePreviousSatisfier
-                |> Maybe.map (max 1)
-                |> Maybe.withDefault 1
-    in
-    case satisfier.kind of
-        -- if satisfier.kind == Assignment.Decision || previousSatisfierLevel /= satisfier.decisionLevel then
-        Assignment.Decision _ ->
-            Ok ( incompat, backtrack incompatChanged previousSatisfierLevel incompat model )
-
-        Assignment.Derivation satisfierTerm { cause } ->
-            if previousSatisfierLevel /= satisfier.decisionLevel then
-                let
-                    _ =
-                        Debug.log "previousLevel /= satisfierLevel" ""
-
-                    _ =
-                        Debug.log (Incompatibility.toDebugString -1 3 incompat) ""
-                in
-                Ok ( incompat, backtrack incompatChanged previousSatisfierLevel incompat model )
-
-            else
-                let
-                    _ =
-                        Debug.log "previousLevel == satisfierLevel" ""
-
-                    _ =
-                        Debug.log ("   satisfier " ++ satisfier.package ++ " " ++ Term.toDebugString satisfierTerm) ""
-
-                    _ =
-                        Debug.log ("   cause\n" ++ Incompatibility.toDebugString -1 6 cause) ""
-
-                    _ =
-                        Debug.log ("   incompat\n" ++ Incompatibility.toDebugString -1 6 incompat) ""
-
-                    priorCause =
-                        Incompatibility.priorCause cause incompat
-
-                    _ =
-                        Debug.log ("   priorCause\n" ++ Incompatibility.toDebugString -1 3 priorCause) ""
-                in
-                -- set incompat to newIncompat
-                -- TODO: tail rec
-                conflictResolution True root priorCause model
 
 
 backtrack : Bool -> Int -> Incompatibility -> Model -> Model
