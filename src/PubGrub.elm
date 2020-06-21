@@ -142,7 +142,7 @@ This tends to find conflicts earlier if any exist,
 since these packages will run out of versions to try more quickly.
 But there's likely room for improvement in these heuristics.
 
-Let "term" be the intersection of all assignment in the partial solution
+Let "term" be the intersection of all assignments in the partial solution
 referring to that package.
 If no version matches that term return an error with
 the package name and the incompatibity {term}.
@@ -172,6 +172,7 @@ since these packages will run out of versions to try more quickly.
 But there's likely room for improvement in these heuristics.
 
 Here we just pick the first one.
+TODO: improve?
 
 -}
 pickPackage : PartialSolution -> Maybe ( String, Term )
@@ -265,7 +266,7 @@ unitPropagationLoop root package changed loopIncompatibilities model =
                 unitPropagationLoop root package changed othersIncompat model
 
 
-{-| Return prior cause and the updated model.
+{-| Return the root cause and the backtracked model.
 -}
 conflictResolution : Bool -> String -> Incompatibility -> Model -> Result String ( Incompatibility, Model )
 conflictResolution incompatChanged root incompat model =
@@ -306,10 +307,6 @@ continueResolution incompatChanged root incompat model =
 
         previousSatisfierLevel =
             Maybe.map (\( a, _, _ ) -> a.decisionLevel) maybePreviousSatisfier
-                -- TODO: According to PubGrub doc, decision level 1 is the decision level
-                -- where root package was selected,
-                -- however I see in the examples that the root level corresponds to decision level 0 ...
-                -- To be clarified.
                 |> Maybe.map (max 1)
                 |> Maybe.withDefault 1
     in
@@ -320,14 +317,6 @@ continueResolution incompatChanged root incompat model =
 
         Assignment.Derivation satisfierTerm { cause } ->
             if previousSatisfierLevel /= satisfier.decisionLevel then
-                -- TODO: this is the case that produces the problematic incompatibility in 5bis
-                -- { bar 2 <= v < 3, baz not (none) }
-                -- Whereas baz not (none) is always satisfied.
-                -- It is satisfied if no baz is selected or if any baz is selected.
-                -- So this incompatibility should just be { bar 2 <= v < 3 }.
-                -- Otherwise the "not (none)" propagates until it becomes the incompatibility
-                -- { root, something not (none) }
-                -- which is not identified as a terminal case but should be.
                 let
                     _ =
                         Debug.log "previousLevel /= satisfierLevel" ""
