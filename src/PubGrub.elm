@@ -269,7 +269,7 @@ unitPropagationLoop root package changed loopIncompatibilities model =
 -}
 conflictResolution : Bool -> String -> Incompatibility -> Model -> Result String ( Incompatibility, Model )
 conflictResolution incompatChanged root incompat model =
-    if Incompatibility.isTerminal root Version.one incompat then
+    if Incompatibility.isTerminal root incompat then
         let
             _ =
                 Debug.log ("Final incompatibility:\n" ++ Incompatibility.toDebugString -1 3 incompat) ""

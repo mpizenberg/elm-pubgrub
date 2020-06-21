@@ -191,14 +191,14 @@ termsString terms =
 {-| Check if an incompatibility should mark the end of the algorithm
 because of an issue.
 -}
-isTerminal : String -> Version -> Incompatibility -> Bool
-isTerminal rootPackage rootVersion (Incompatibility incompat _) =
+isTerminal : String -> Incompatibility -> Bool
+isTerminal rootPackage (Incompatibility incompat _) =
     case incompat.asList of
         [] ->
             True
 
-        ( package, Term.Positive range ) :: [] ->
-            package == rootPackage && Range.contains rootVersion range
+        ( package, Term.Positive _ ) :: [] ->
+            package == rootPackage
 
         _ ->
             False
