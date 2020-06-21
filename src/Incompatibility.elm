@@ -258,8 +258,16 @@ this needs special treatment.
 
 -}
 priorCause : String -> Incompatibility -> Incompatibility -> Incompatibility
-priorCause name ((Incompatibility cause _) as i1) ((Incompatibility incompat _) as i2) =
-    union (Dict.remove name cause.asDict) (Dict.remove name incompat.asDict) (DerivedFrom i1 i2)
+priorCause package ((Incompatibility cause k1) as i1) ((Incompatibility incompat k2) as i2) =
+    case ( k1, k2 ) of
+        ( NoVersion, _ ) ->
+            union (Dict.remove package cause.asDict) (Dict.remove package incompat.asDict) k2
+
+        ( _, NoVersion ) ->
+            union (Dict.remove package cause.asDict) (Dict.remove package incompat.asDict) k1
+
+        _ ->
+            union (Dict.remove package cause.asDict) (Dict.remove package incompat.asDict) (DerivedFrom i1 i2)
 
 
 {-| Union of all terms in two incompatibilities.
