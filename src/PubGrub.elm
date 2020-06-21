@@ -362,15 +362,15 @@ continueResolution incompatChanged root incompat model =
 
 
 backtrack : Bool -> Int -> Incompatibility -> Model -> Model
-backtrack incompatChanged previousSatisfierLevel incompat model =
+backtrack incompatChanged previousSatisfierLevel rootCause model =
     { partialSolution = PartialSolution.backtrack previousSatisfierLevel model.partialSolution
     , incompatibilities =
         if incompatChanged then
             let
                 _ =
-                    Debug.log ("Add root cause incompatibility:\n" ++ Incompatibility.toDebugString -1 3 incompat) ""
+                    Debug.log ("Add root cause incompatibility:\n" ++ Incompatibility.toDebugString -1 3 rootCause) ""
             in
-            Incompatibility.merge incompat model.incompatibilities
+            Incompatibility.merge rootCause model.incompatibilities
 
         else
             model.incompatibilities
