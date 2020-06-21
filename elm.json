@@ -9,6 +9,7 @@
         "Database.ElmJson",
         "Database.History",
         "Incompatibility",
+        "Memory",
         "PartialSolution",
         "PubGrub",
         "Range",
