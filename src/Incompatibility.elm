@@ -1,15 +1,15 @@
 module Incompatibility exposing
-    ( Incompatibility, asDict, fromTerm, fromDependencies, toDebugString
+    ( Incompatibility, asDict, notRoot, noVersion, fromDependencies, toDebugString
     , insert, merge, priorCause
     , Relation(..), relation
-    , singlePositive
+    , isTerminal
     )
 
 {-| An incompatibility is a set of terms that should never
 be satisfied all together.
 This module provides functions to work with incompatibilities.
 
-@docs Incompatibility, asDict, fromTerm, fromDependencies, toDebugString
+@docs Incompatibility, asDict, notRoot, noVersion, fromDependencies, toDebugString
 
 
 # Composition of incompatibilities
@@ -24,7 +24,7 @@ This module provides functions to work with incompatibilities.
 
 # Other helper functions
 
-@docs singlePositive
+@docs isTerminal
 
 -}
 
@@ -67,7 +67,7 @@ of an IncompatibilityTree variant.
 
 -}
 type Incompatibility
-    = Incompatibility (Dict String Term) (List ( String, Term )) Kind
+    = Incompatibility { asDict : Dict String Term, asList : List ( String, Term ) } Kind
 
 
 {-| An incompatibility can originate from a package dependency
@@ -78,9 +78,10 @@ until I figure out how to get rid of this case.
 
 -}
 type Kind
-    = FromDependencyOf String Version
+    = NotRoot
+    | NoVersion
+    | FromDependencyOf String Version
     | DerivedFrom Incompatibility Incompatibility
-    | Unknown
 
 
 {-| A Relation describes how a set of terms can be compared to an incompatibility.
@@ -108,15 +109,41 @@ type Relation
 {-| Retrieve the dictionary representation of an incompatibility.
 -}
 asDict : Incompatibility -> Dict String Term
-asDict (Incompatibility incompat _ _) =
-    incompat
+asDict (Incompatibility incompat _) =
+    incompat.asDict
 
 
-{-| Create a singleton incompatibility containing a unique term.
+{-| Empty incompatibility.
 -}
-fromTerm : String -> Term -> Incompatibility
-fromTerm package term =
-    Incompatibility (Dict.singleton package term) [ ( package, term ) ] Unknown
+empty : Kind -> Incompatibility
+empty kind =
+    Incompatibility { asDict = Dict.empty, asList = [] } kind
+
+
+{-| Singleton incompatibility.
+-}
+singleton : String -> Term -> Kind -> Incompatibility
+singleton package term kind =
+    Incompatibility { asDict = Dict.singleton package term, asList = [ ( package, term ) ] } kind
+
+
+{-| Create the initial "not root" incompatibility.
+-}
+notRoot : String -> Version -> Incompatibility
+notRoot package version =
+    let
+        term =
+            Term.Negative (Range.exact version)
+    in
+    Incompatibility { asDict = Dict.singleton package term, asList = [ ( package, term ) ] } NotRoot
+
+
+{-| Create an incompatibility to remember that a given range
+does not contain any version.
+-}
+noVersion : String -> Term -> Incompatibility
+noVersion package term =
+    Incompatibility { asDict = Dict.singleton package term, asList = [ ( package, term ) ] } NoVersion
 
 
 
@@ -127,23 +154,26 @@ fromTerm package term =
 for debug means.
 -}
 toDebugString : Int -> Int -> Incompatibility -> String
-toDebugString recursiveDepth indent (Incompatibility _ list kind) =
+toDebugString recursiveDepth indent (Incompatibility { asList } kind) =
     case ( recursiveDepth, kind ) of
         ( 0, _ ) ->
             ""
 
         ( _, FromDependencyOf package version ) ->
-            (String.repeat indent " " ++ termsString (List.reverse list))
+            (String.repeat indent " " ++ termsString (List.reverse asList))
                 ++ ("  <<<  from dependency of " ++ package ++ " at version " ++ Version.toDebugString version)
 
-        ( _, Unknown ) ->
-            String.repeat indent " " ++ termsString list ++ "  <<<  from unknown reason ..."
+        ( _, NotRoot ) ->
+            String.repeat indent " " ++ termsString asList ++ "  <<<  initial 'not root' incompatibility"
+
+        ( _, NoVersion ) ->
+            String.repeat indent " " ++ termsString asList ++ "  <<<  no version"
 
         ( 1, DerivedFrom _ _ ) ->
-            String.repeat indent " " ++ termsString list ++ "  <<<  derived"
+            String.repeat indent " " ++ termsString asList ++ "  <<<  derived"
 
         ( _, DerivedFrom cause1 cause2 ) ->
-            (String.repeat indent " " ++ termsString list ++ "  <<<  derived from:")
+            (String.repeat indent " " ++ termsString asList ++ "  <<<  derived from:")
                 ++ ("\n" ++ toDebugString (recursiveDepth - 1) (indent + 3) cause1)
                 ++ ("\n" ++ toDebugString (recursiveDepth - 1) (indent + 3) cause2)
 
@@ -158,14 +188,17 @@ termsString terms =
 -- Functions
 
 
-{-| Check if an incompatibility contains a single positive term
-related to the given package.
+{-| Check if an incompatibility should mark the end of the algorithm
+because of an issue.
 -}
-singlePositive : String -> Incompatibility -> Bool
-singlePositive package (Incompatibility _ incompat _) =
-    case incompat of
-        ( name, Term.Positive _ ) :: [] ->
-            name == package
+isTerminal : String -> Version -> Incompatibility -> Bool
+isTerminal rootPackage rootVersion (Incompatibility incompat _) =
+    case incompat.asList of
+        [] ->
+            True
+
+        ( package, Term.Positive range ) :: [] ->
+            package == rootPackage && Range.contains rootVersion range
 
         _ ->
             False
@@ -190,8 +223,7 @@ fromDependency package version ( depPackage, depRange ) =
         term =
             Term.Positive (Range.exact version)
     in
-    FromDependencyOf package version
-        |> Incompatibility (Dict.singleton package term) [ ( package, term ) ]
+    singleton package term (FromDependencyOf package version)
         |> insert depPackage (Term.Negative depRange)
 
 
@@ -226,15 +258,15 @@ this needs special treatment.
 
 -}
 priorCause : String -> Incompatibility -> Incompatibility -> Incompatibility
-priorCause name ((Incompatibility cause _ _) as i1) ((Incompatibility incompat _ _) as i2) =
-    union (Dict.remove name cause) (Dict.remove name incompat) (DerivedFrom i1 i2)
+priorCause name ((Incompatibility cause _) as i1) ((Incompatibility incompat _) as i2) =
+    union (Dict.remove name cause.asDict) (Dict.remove name incompat.asDict) (DerivedFrom i1 i2)
 
 
 {-| Union of all terms in two incompatibilities.
 -}
 union : Dict String Term -> Dict String Term -> Kind -> Incompatibility
 union i1 i2 kind =
-    Dict.merge insert fuse insert i1 i2 (Incompatibility Dict.empty [] kind)
+    Dict.merge insert fuse insert i1 i2 (empty kind)
 
 
 fuse : String -> Term -> Term -> Incompatibility -> Incompatibility
@@ -261,8 +293,12 @@ fuse name t1 t2 incompatibility =
 Use ONLY if guaranted that the package name is not already in the incompatibility.
 -}
 insert : String -> Term -> Incompatibility -> Incompatibility
-insert name term (Incompatibility dict list kind) =
-    Incompatibility (Dict.insert name term dict) (( name, term ) :: list) kind
+insert name term (Incompatibility incompat kind) =
+    Incompatibility
+        { asDict = Dict.insert name term incompat.asDict
+        , asList = ( name, term ) :: incompat.asList
+        }
+        kind
 
 
 {-| We say that a set of terms S satisfies an incompatibility I
@@ -273,8 +309,8 @@ If S satisfies all but one of I's terms and is inconclusive for the remaining te
 we say S "almost satisfies" I and we call the remaining term the "unsatisfied term".
 -}
 relation : Dict String (List Term) -> Incompatibility -> Relation
-relation set (Incompatibility _ list _) =
-    relationStep set list Satisfies
+relation set (Incompatibility { asList } _) =
+    relationStep set asList Satisfies
 
 
 relationStep : Dict String (List Term) -> List ( String, Term ) -> Relation -> Relation

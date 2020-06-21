@@ -43,7 +43,7 @@ type alias Model =
 
 init : String -> Version -> Model
 init root version =
-    { incompatibilities = [ Incompatibility.fromTerm root (Term.Negative (Range.exact version)) ]
+    { incompatibilities = [ Incompatibility.notRoot root version ]
     , partialSolution = PartialSolution.empty
     }
 
@@ -154,7 +154,7 @@ pickPackageVersion partial listAvailableVersions =
         Just ( package, term ) ->
             pickVersion (listAvailableVersions package) term
                 |> Maybe.map (Tuple.pair package)
-                |> Result.fromMaybe ( package, Incompatibility.fromTerm package term )
+                |> Result.fromMaybe ( package, Incompatibility.noVersion package term )
                 |> Just
 
         Nothing ->
@@ -269,17 +269,7 @@ unitPropagationLoop root package changed loopIncompatibilities model =
 -}
 conflictResolution : Bool -> String -> Incompatibility -> Model -> Result String ( Incompatibility, Model )
 conflictResolution incompatChanged root incompat model =
-    if Dict.isEmpty (Incompatibility.asDict incompat) || Incompatibility.singlePositive root incompat then
-        -- TODO: Actually I think "Incompatibility.singlePositive root" is not enought
-        -- in the case of checking package dependencies (not application).
-        -- There might be other packages depending on the same package as the root one
-        -- but at an incompatible range.
-        -- For example, we are solving A = 1.0.0
-        -- and due to a transitive dependency, some package requires A >= 2.0.0.
-        -- We may temporarily end up with { A >= 2.0.0 }? (not sure)
-        -- And so this should just invalidate the transitive dependency and backtrack,
-        -- not return an error.
-        -- To be verified.
+    if Incompatibility.isTerminal root Version.one incompat then
         let
             _ =
                 Debug.log ("Final incompatibility:\n" ++ Incompatibility.toDebugString -1 3 incompat) ""
