@@ -212,6 +212,10 @@ prependDerivation package term cause (PartialSolution partial) =
 -}
 backtrack : Int -> PartialSolution -> PartialSolution
 backtrack level (PartialSolution partial) =
+    let
+        _ =
+            Debug.log "backtrack to level" level
+    in
     PartialSolution (dropUntilLevel level partial)
 
 
