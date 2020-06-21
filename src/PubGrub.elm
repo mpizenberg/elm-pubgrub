@@ -55,13 +55,6 @@ setIncompatibilities incompatibilities model =
     }
 
 
-setPartialSolution : PartialSolution -> Model -> Model
-setPartialSolution partialSolution model =
-    { incompatibilities = model.incompatibilities
-    , partialSolution = partialSolution
-    }
-
-
 updateIncompatibilities : (List Incompatibility -> List Incompatibility) -> Model -> Model
 updateIncompatibilities f { incompatibilities, partialSolution } =
     { incompatibilities = f incompatibilities
