@@ -310,6 +310,7 @@ continueResolution incompatChanged root incompat model =
                 -- where root package was selected,
                 -- however I see in the examples that the root level corresponds to decision level 0 ...
                 -- To be clarified.
+                |> Maybe.map (max 1)
                 |> Maybe.withDefault 1
     in
     case satisfier.kind of
