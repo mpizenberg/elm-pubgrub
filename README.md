@@ -5,7 +5,6 @@ version solving algorithm in the Elm programming language.
 
 ## Run the examples
 
-The code is almost done but I'm still facing some bugs.
 Hardcoded examples are located in the `Database.Stub` module.
 To run example "N" replace the function inside `getDependencies`
 by `getDependenciesN` and the function inside `listAvailableVersions`
@@ -23,9 +22,6 @@ Examples 1 to 4 are made increasingly harder by triggering more parts
 of the algorithm and are all passing.
 Example 5 is the first error reporting algorithm
 but error reporting is not implemented yet.
-Example **5bis** is an adaptation of example 5 I made,
-that makes elm-pubgrub crash (arrive in an impossible state).
-**This is what I'd like to fix as a priority**.
 
 PS: you can stay in the repl and change the example in `Database.Stub`,
 it will be automatically picked up next time you run `PubGrub.solve`.
