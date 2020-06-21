@@ -351,37 +351,14 @@ continueResolution incompatChanged root incompat model =
                         Debug.log ("   incompat\n" ++ Incompatibility.toDebugString -1 6 incompat) ""
 
                     priorCause =
-                        Incompatibility.priorCause satisfier.package cause incompat
+                        Incompatibility.priorCause cause incompat
+
+                    _ =
+                        Debug.log ("   priorCause\n" ++ Incompatibility.toDebugString -1 3 priorCause) ""
                 in
-                -- if satisfier does not satisfy term
-                if not (Term.satisfies term [ satisfierTerm ]) then
-                    -- add `not (satisfier \ term)` to priorCause. Then set incompat to priorCause
-                    -- satisfier \ term  ===  intersection satisfier (not term)
-                    -- not (...)  ===  union (not satisfier) (term)
-                    let
-                        derived =
-                            Term.union term (Term.negate satisfierTerm)
-
-                        newIncompat =
-                            -- priorCause is guaranted to not contain satisfier.package
-                            -- so we can safely insert the derived term.
-                            Incompatibility.insert satisfier.package derived priorCause
-
-                        _ =
-                            Debug.log ("   priorCause\n" ++ Incompatibility.toDebugString -1 3 newIncompat) ""
-                    in
-                    -- set incompat to newIncompat
-                    -- TODO: tail rec
-                    conflictResolution True root newIncompat model
-
-                else
-                    -- set incompat to priorCause
-                    -- TODO: tail rec
-                    let
-                        _ =
-                            Debug.log ("   priorCause\n" ++ Incompatibility.toDebugString -1 3 priorCause) ""
-                    in
-                    conflictResolution True root priorCause model
+                -- set incompat to newIncompat
+                -- TODO: tail rec
+                conflictResolution True root priorCause model
 
 
 backtrack : Bool -> Int -> Incompatibility -> Model -> Model

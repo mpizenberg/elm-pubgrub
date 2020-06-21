@@ -1,6 +1,6 @@
 module Incompatibility exposing
     ( Incompatibility, asDict, notRoot, noVersion, fromDependencies, toDebugString
-    , insert, merge, priorCause
+    , merge, priorCause
     , Relation(..), relation
     , isTerminal
     )
@@ -14,7 +14,7 @@ This module provides functions to work with incompatibilities.
 
 # Composition of incompatibilities
 
-@docs insert, merge, priorCause
+@docs merge, priorCause
 
 
 # Relation of satisfaction
@@ -253,17 +253,17 @@ merge incompat allIncompats =
 the terms in the incompatibility and the terms in the satisfier's cause
 minus the terms referring to satisfier's package.
 -}
-priorCause : String -> Incompatibility -> Incompatibility -> Incompatibility
-priorCause package ((Incompatibility cause k1) as i1) ((Incompatibility incompat k2) as i2) =
+priorCause : Incompatibility -> Incompatibility -> Incompatibility
+priorCause ((Incompatibility cause k1) as i1) ((Incompatibility incompat k2) as i2) =
     case ( k1, k2 ) of
         ( NoVersion, _ ) ->
-            union (Dict.remove package cause.asDict) (Dict.remove package incompat.asDict) k2
+            union cause.asDict incompat.asDict k2
 
         ( _, NoVersion ) ->
-            union (Dict.remove package cause.asDict) (Dict.remove package incompat.asDict) k1
+            union cause.asDict incompat.asDict k1
 
         _ ->
-            union (Dict.remove package cause.asDict) (Dict.remove package incompat.asDict) (DerivedFrom i1 i2)
+            union cause.asDict incompat.asDict (DerivedFrom i1 i2)
 
 
 {-| Union of all terms in two incompatibilities.
@@ -275,13 +275,6 @@ union i1 i2 kind =
 
 fuse : String -> Term -> Term -> Incompatibility -> Incompatibility
 fuse name t1 t2 incompatibility =
-    -- TODO: actually maybe we should do the general thing
-    -- consisting of removing t1 U t2 from merged prior cause incompat
-    -- if not t2 is included in t1?
-    -- Since this will always be satisfied anyway.
-    -- Does this corresponds to `not none` as result of terms union?
-    -- That is satisfied if no version is picked or if a version
-    -- is picked that is anything.
     let
         termUnion =
             Term.union t1 t2
