@@ -2,6 +2,7 @@ module Incompatibility exposing
     ( Incompatibility, asDict, notRoot, noVersion, fromDependencies, toDebugString
     , merge, priorCause
     , Relation(..), relation
+    , DerivationNode, DerivationEdge, derivationNodesAndEdges
     , isTerminal
     )
 
@@ -22,6 +23,11 @@ This module provides functions to work with incompatibilities.
 @docs Relation, relation
 
 
+# Error reporting
+
+@docs DerivationNode, DerivationEdge, derivationNodesAndEdges
+
+
 # Other helper functions
 
 @docs isTerminal
@@ -29,6 +35,7 @@ This module provides functions to work with incompatibilities.
 -}
 
 import Dict exposing (Dict)
+import Graph exposing (Edge, Node)
 import Range exposing (Range)
 import Term exposing (Term)
 import Version exposing (Version)
@@ -178,6 +185,8 @@ toDebugString recursiveDepth indent (Incompatibility { asList } kind) =
                 ++ ("\n" ++ toDebugString (recursiveDepth - 1) (indent + 3) cause2)
 
 
+{-| Incompatibility terms as a printable string.
+-}
 termsString : List ( String, Term ) -> String
 termsString terms =
     List.map (\( name, term ) -> name ++ ": " ++ Term.toDebugString term) terms
@@ -335,3 +344,68 @@ relationStep set incompat relationAccum =
 
                         _ ->
                             relationStep set otherIncompats Inconclusive
+
+
+
+-- Error reporting
+
+
+{-| Alias for the derivation graph nodes,
+containing terms in an incompatibility.
+-}
+type alias DerivationNode =
+    Node (List ( String, Term ))
+
+
+{-| Alias for the derivation graph edges.
+-}
+type alias DerivationEdge =
+    Edge ()
+
+
+{-| Build the list of nodes and edges of the derivation graph
+while walking through the binary tree.
+
+Incorrect for now since duplicated nodes are not identified
+as such and attributed new ids (which is wrong).
+
+-}
+derivationNodesAndEdges : Incompatibility -> ( List DerivationNode, List DerivationEdge )
+derivationNodesAndEdges (Incompatibility { asList } kind) =
+    case kind of
+        DerivedFrom i1 i2 ->
+            let
+                node =
+                    -- Id of the root node is 0
+                    Node 0 asList
+
+                ( leftCount, leftNodes, leftEdges ) =
+                    nodesAndEdgesRec 1 i1 0 ( [ node ], [] )
+
+                ( _, allNodes, allEdges ) =
+                    nodesAndEdgesRec (leftCount + 1) i2 0 ( leftNodes, leftEdges )
+            in
+            ( allNodes, allEdges )
+
+        _ ->
+            ( [ Node 0 asList ], [] )
+
+
+nodesAndEdgesRec : Int -> Incompatibility -> Int -> ( List DerivationNode, List DerivationEdge ) -> ( Int, List DerivationNode, List DerivationEdge )
+nodesAndEdgesRec count (Incompatibility { asList } kind) parentId ( nodes, edges ) =
+    case kind of
+        DerivedFrom i1 i2 ->
+            let
+                node =
+                    Node count asList
+
+                edge =
+                    Edge parentId count ()
+
+                ( leftCount, leftNodes, leftEdges ) =
+                    nodesAndEdgesRec (count + 1) i1 count ( node :: nodes, edge :: edges )
+            in
+            nodesAndEdgesRec (leftCount + 1) i2 count ( leftNodes, leftEdges )
+
+        _ ->
+            ( count, Node count asList :: nodes, Edge parentId count () :: edges )

@@ -27,6 +27,7 @@ by Martin Gebser, Roland Kaminski, Benjamin Kaufmann and Torsten Schaub.
 
 import Assignment
 import Database.Stub as Stub
+import DerivationGraph
 import Dict
 import Incompatibility exposing (Incompatibility)
 import PartialSolution exposing (PartialSolution)
@@ -283,6 +284,14 @@ conflictResolution incompatChanged root incompat model =
 
             _ =
                 Debug.log ("Model partial solution:" ++ PartialSolution.toDebugString model.partialSolution) ""
+
+            derivationGraphString =
+                Incompatibility.derivationNodesAndEdges incompat
+                    |> DerivationGraph.fromNodesAndEdges
+                    |> DerivationGraph.toDot
+
+            _ =
+                Debug.log derivationGraphString ""
         in
         Err reportError
 
