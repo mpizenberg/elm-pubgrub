@@ -1,8 +1,8 @@
 module DerivationGraph exposing (DerivationGraph, Incompat, fromNodesAndEdges, toDot)
 
-import Graph exposing (Edge, Graph, Node)
+import Graph exposing (Edge, Graph, Node, NodeContext)
 import Graph.DOT
-import IntDict
+import IntDict exposing (IntDict)
 import Term exposing (Term)
 
 
@@ -30,6 +30,52 @@ termsString : List ( String, Term ) -> String
 termsString terms =
     List.map (\( name, term ) -> name ++ ": " ++ Term.toDebugString term) terms
         |> String.join ", "
+
+
+type alias ReportGraph =
+    Graph ReportNode ()
+
+
+type alias ReportNode =
+    { derivedFrom : Maybe ( Int, Int )
+    , causesTwoOrMore : Bool
+    , line : Maybe Int
+    , incompat : Incompat
+    }
+
+
+toReportGraph : DerivationGraph -> ReportGraph
+toReportGraph graph =
+    Graph.mapContexts reportContext graph
+
+
+reportContext : NodeContext Incompat () -> NodeContext ReportNode ()
+reportContext { node, incoming, outgoing } =
+    { node = initReportContextNode node incoming outgoing
+    , incoming = incoming
+    , outgoing = outgoing
+    }
+
+
+initReportContextNode : Incompat -> IntDict () -> IntDict () -> ReportNode
+initReportContextNode incompat incoming outgoing =
+    let
+        derivedFrom =
+            case IntDict.keys outgoing of
+                [] ->
+                    Nothing
+
+                first :: second :: [] ->
+                    Just ( first, second )
+
+                _ ->
+                    Debug.todo "Should never happen, must be 0 or 2"
+    in
+    { derivedFrom = derivedFrom
+    , causesTwoOrMore = IntDict.size incoming >= 2
+    , line = Nothing
+    , incompat = incompat
+    }
 
 
 reportError : Int -> DerivationGraph -> List String -> List String
