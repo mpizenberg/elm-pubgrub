@@ -57,8 +57,8 @@ reportContext { node, incoming, outgoing } =
     }
 
 
-initReportContextNode : Incompat -> IntDict () -> IntDict () -> ReportNode
-initReportContextNode incompat incoming outgoing =
+initReportContextNode : Node Incompat -> IntDict () -> IntDict () -> Node ReportNode
+initReportContextNode node incoming outgoing =
     let
         derivedFrom =
             case IntDict.keys outgoing of
@@ -71,11 +71,38 @@ initReportContextNode incompat incoming outgoing =
                 _ ->
                     Debug.todo "Should never happen, must be 0 or 2"
     in
-    { derivedFrom = derivedFrom
-    , causesTwoOrMore = IntDict.size incoming >= 2
-    , line = Nothing
-    , incompat = incompat
+    { id = node.id
+    , label =
+        { derivedFrom = derivedFrom
+        , causesTwoOrMore = IntDict.size incoming >= 2
+        , line = Nothing
+        , incompat = node.label
+        }
     }
+
+
+reportErrorBis : Node ReportNode -> ReportGraph -> List String -> List String
+reportErrorBis root graph lines =
+    -- TODO:
+    -- Finally, if incompatibility causes two or more incompatibilities,
+    -- give the line that was just written a line number.
+    -- Set this as incompatibility's line number.
+    case root.label.derivedFrom of
+        Just ( causeId1, causeId2 ) ->
+            case ( Graph.get causeId1 graph, Graph.get causeId2 graph ) of
+                ( Just cause1, Just cause2 ) ->
+                    reportErrorCore root cause1.node cause2.node graph lines
+
+                _ ->
+                    Debug.todo "Both causes nodes should exist"
+
+        Nothing ->
+            Debug.todo "Should not happen, should not have called recursively on a non derived incompat"
+
+
+reportErrorCore : Node ReportNode -> Node ReportNode -> Node ReportNode -> ReportGraph -> List String -> List String
+reportErrorCore root cause1 cause2 graph lines =
+    Debug.todo "core"
 
 
 reportError : Int -> DerivationGraph -> List String -> List String
