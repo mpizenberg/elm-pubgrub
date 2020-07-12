@@ -81,8 +81,8 @@ initReportContextNode node incoming outgoing =
     }
 
 
-reportErrorBis : Node ReportNode -> ReportGraph -> List String -> List String
-reportErrorBis root graph lines =
+reportError : Node ReportNode -> ReportGraph -> List String -> List String
+reportError root graph lines =
     -- TODO:
     -- Finally, if incompatibility causes two or more incompatibilities,
     -- give the line that was just written a line number.
@@ -102,78 +102,109 @@ reportErrorBis root graph lines =
 
 reportErrorCore : Node ReportNode -> Node ReportNode -> Node ReportNode -> ReportGraph -> List String -> List String
 reportErrorCore root cause1 cause2 graph lines =
-    Debug.todo "core"
-
-
-reportError : Int -> DerivationGraph -> List String -> List String
-reportError rootId graph lines =
-    -- TODO:
-    -- Finally, if incompatibility causes two or more incompatibilities,
-    -- give the line that was just written a line number.
-    -- Set this as incompatibility's line number.
-    case Graph.get rootId graph of
-        Nothing ->
-            Debug.todo "This should not happen, node must exist"
-
-        Just { node, outgoing } ->
-            if causedByTwoDerived node outgoing then
-                if haveLinesNumbers outgoing then
+    case ( cause1.label.derivedFrom, cause2.label.derivedFrom ) of
+        -- 1. If incompatibility is caused by two other derived incompatibilities:
+        ( Just ( id11, id12 ), Just ( id21, id22 ) ) ->
+            case ( cause1.label.line, cause2.label.line ) of
+                -- 1.i. If both causes already have line numbers:
+                ( Just line1, Just line2 ) ->
                     "Because cause1 (cause1.line) and cause2 (cause2.line), incompatibility." :: lines
 
-                else if onlyOneCauseLineNumber outgoing then
-                    let
-                        newLines =
-                            reportError idOfCauseWithoutLineNumber graph lines
-                    in
-                    "And because causeWithLine (causeWithLine.line), incompatibility." :: newLines
-                    -- when neither has a line number
+                -- 1.ii. Otherwise, if only one cause has a line number:
+                ( Just line1, Nothing ) ->
+                    "And because cause1 (cause1.line), incompatibility."
+                        :: reportError cause2 graph lines
 
-                else if atLeastOneCauseIncompatibilityIsCausedByTwoExternal outgoing then
-                    let
-                        ( simple, complex ) =
-                            simpleAndComplex outgoing
+                ( Nothing, Just line2 ) ->
+                    "And because cause2 (cause2.line), incompatibility."
+                        :: reportError cause1 graph lines
 
-                        newLines =
-                            reportError complex graph lines
-                    in
-                    "Thus, incompatibility." :: reportError simple graph newLines
+                -- 1.iii. Otherwise (when neither has a line number):
+                ( Nothing, Nothing ) ->
+                    --- 1.iii.a.
+                    if bothExternal id11 id12 graph then
+                        -- Beware this will not be correct anymore
+                        -- when we also update line numbers in the graph.
+                        "Thus, incompatibility."
+                            :: reportError cause1 graph []
+                            ++ reportError cause2 graph lines
 
-                else
-                    let
-                        ( first, second ) =
-                            firstAndSecond outgoing
+                    else if bothExternal id21 id22 graph then
+                        -- Beware this will not be correct anymore
+                        -- when we also update line numbers in the graph.
+                        "Thus, incompatibility."
+                            :: reportError cause2 graph []
+                            ++ reportError cause1 graph lines
 
-                        firstLines =
-                            reportError first graph lines
+                    else
+                        --- 1.iii.b.
+                        "And because cause1 (cause1.line), incompatibility."
+                            :: reportError cause2 graph []
+                            ++ ("" :: reportError cause1 graph lines)
 
-                        _ =
-                            Debug.todo "give the final line a line number if it doesn't have one already. Set this as the first cause's line number."
+        -- 2. Otherwise, if only one of incompatibility's causes is another derived incompatibility:
+        ( Just derivedFrom, Nothing ) ->
+            reportOneDerivedAndOneExternal cause1 derivedFrom cause2 graph lines
 
-                        secondLines =
-                            reportError second graph ("" :: firstLines)
+        ( Nothing, Just derivedFrom ) ->
+            reportOneDerivedAndOneExternal cause2 derivedFrom cause1 graph lines
 
-                        _ =
-                            Debug.todo "add a line number to the final line. Associate this line number with the first cause."
-                    in
-                    "And because cause1 (cause1.line), incompatibility." :: secondLines
+        -- 3. Otherwise (when both of incompatibility's causes are external incompatibilities):
+        ( Nothing, Nothing ) ->
+            "Because cause1 and cause2, incompatibility." :: lines
 
-            else if causedByOneDerived node outgoing then
-                if hasLineNumber derived then
-                    "Because external and derived (derived.line), incompatibility." :: lines
 
-                else if causedByOneDerivedIncompatWithoutLineNumber derived then
-                    let
-                        ( priorDerived, priorExternal ) =
-                            priorDerivedAndExternal derived
+bothExternal : Int -> Int -> ReportGraph -> Bool
+bothExternal id1 id2 graph =
+    case ( Graph.get id1 graph, Graph.get id2 graph ) of
+        ( Just context1, Just context2 ) ->
+            (context1.node.label.derivedFrom == Nothing)
+                && (context2.node.label.derivedFrom == Nothing)
 
-                        newLines =
-                            reportError priorDerived graph lines
-                    in
-                    "And because priorExternal and external, incompatibility." :: newLines
+        _ ->
+            Debug.todo "Both nodes should exist"
 
-                else
-                    "And because external, incompatibility." :: reportError derived graph lines
-                -- when both of incompatibility's causes are external incompatibilities
 
-            else
-                "Because cause1 and cause2, incompatibility." :: lines
+reportOneDerivedAndOneExternal : Node ReportNode -> ( Int, Int ) -> Node ReportNode -> ReportGraph -> List String -> List String
+reportOneDerivedAndOneExternal derived ( id1, id2 ) external graph lines =
+    -- 2.i. If derived already has a line number:
+    if derived.label.line /= Nothing then
+        "Because external and derived (derived.line), incompatibility." :: lines
+
+    else
+        -- 2.ii. Otherwise, if derived is itself caused by exactly one derived incompatibility and that incompatibility doesn't have a line number:
+        case onlyOneDerivedIncompatWithoutLineNumber id1 id2 graph of
+            Just ( priorDerived, priorExternal ) ->
+                "And because priorExternal and external, incompatibility."
+                    :: reportError priorDerived graph lines
+
+            -- 2.iii. Otherwise
+            Nothing ->
+                "And because external, incompatibility."
+                    :: reportError derived graph lines
+
+
+onlyOneDerivedIncompatWithoutLineNumber : Int -> Int -> ReportGraph -> Maybe ( Node ReportNode, Node ReportNode )
+onlyOneDerivedIncompatWithoutLineNumber id1 id2 graph =
+    case ( Graph.get id1 graph, Graph.get id2 graph ) of
+        ( Just ctx1, Just ctx2 ) ->
+            case ( ctx1.node.label.derivedFrom, ctx2.node.label.derivedFrom ) of
+                ( Just _, Nothing ) ->
+                    if ctx1.node.label.line == Nothing then
+                        Just ( ctx1.node, ctx2.node )
+
+                    else
+                        Nothing
+
+                ( Nothing, Just _ ) ->
+                    if ctx2.node.label.line == Nothing then
+                        Just ( ctx2.node, ctx1.node )
+
+                    else
+                        Nothing
+
+                _ ->
+                    Nothing
+
+        _ ->
+            Debug.todo "Both nodes should exist"
