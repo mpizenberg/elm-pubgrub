@@ -114,6 +114,7 @@ buildFrom root ({ graph } as model) =
             case ( Graph.get causeId1 graph, Graph.get causeId2 graph ) of
                 ( Just cause1, Just cause2 ) ->
                     buildFromHelper root cause1.node cause2.node model
+                        |> maybeGiveLineNumber root
 
                 _ ->
                     Debug.todo "Both causes nodes should exist"
@@ -182,14 +183,17 @@ buildFromHelper root cause1 cause2 ({ graph } as model) =
                     else
                         --- 1.iii.b.
                         -- "And because cause1 (cause1.line), incompatibility."
-                        -- TODO: add line
-                        buildFrom cause1 model
-                            |> addLine ""
+                        let
+                            ( line, newModel ) =
+                                buildFrom cause1 model
+                                    |> giveLineNumberIfNoneYet cause1
+                        in
+                        addLine "" newModel
                             |> buildFrom cause2
                             |> addLine
                                 ("And because "
                                     ++ incompatReport " depends on " cause1.label.incompat
-                                    ++ ", "
+                                    ++ (" (" ++ String.fromInt line ++ "), ")
                                     ++ incompatReport " requires " root.label.incompat
                                     ++ "."
                                 )
@@ -259,6 +263,58 @@ reportOneDerivedAndOneExternal root derived ( id1, id2 ) external ({ graph, line
                             ++ incompatReport " requires " root.label.incompat
                             ++ "."
                         )
+
+
+maybeGiveLineNumber : Node ReportNode -> Model -> Model
+maybeGiveLineNumber root model =
+    if root.label.causesTwoOrMore then
+        Tuple.second (giveLineNumberIfNoneYet root model)
+
+    else
+        model
+
+
+giveLineNumberIfNoneYet : Node ReportNode -> Model -> ( Int, Model )
+giveLineNumberIfNoneYet node ({ graph, lines, referenceCount } as model) =
+    case ( node.label.line, lines ) of
+        ( Just line, _ ) ->
+            ( line, model )
+
+        ( Nothing, latestLine :: olderLines ) ->
+            let
+                incrementRefCount =
+                    referenceCount + 1
+            in
+            ( incrementRefCount
+            , { graph = Graph.update node.id (setLineNumber incrementRefCount) graph
+              , lines = (latestLine ++ " (" ++ String.fromInt incrementRefCount ++ ")") :: olderLines
+              , referenceCount = incrementRefCount
+              }
+            )
+
+        ( Nothing, [] ) ->
+            Debug.todo "There must be at least one line"
+
+
+setLineNumber : Int -> Maybe (NodeContext ReportNode ()) -> Maybe (NodeContext ReportNode ())
+setLineNumber line maybeContext =
+    case maybeContext of
+        Just { node, incoming, outgoing } ->
+            let
+                label =
+                    node.label
+            in
+            Just
+                { node =
+                    { id = node.id
+                    , label = { label | line = Just line }
+                    }
+                , incoming = incoming
+                , outgoing = outgoing
+                }
+
+        Nothing ->
+            Debug.todo "The node must exist, there is an error somewhere"
 
 
 
