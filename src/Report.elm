@@ -35,6 +35,18 @@ type alias Incompat =
 
 
 
+-- Helper functions
+
+
+addLine : String -> Model -> Model
+addLine line { referenceCount, graph, lines } =
+    { referenceCount = referenceCount
+    , graph = graph
+    , lines = line :: lines
+    }
+
+
+
 -- Initialize the ReportGraph
 
 
@@ -84,14 +96,15 @@ generate rootId graph =
 
                 Nothing ->
                     Debug.todo "root node must exist"
+
+        { lines } =
+            buildFrom root { graph = graph, lines = [], referenceCount = 0 }
     in
-    buildFrom root graph []
-        |> List.reverse
-        |> String.join "\n"
+    String.join "\n" (List.reverse lines)
 
 
-buildFrom : Node ReportNode -> ReportGraph -> List String -> List String
-buildFrom root graph lines =
+buildFrom : Node ReportNode -> Model -> Model
+buildFrom root ({ graph } as model) =
     -- TODO:
     -- Finally, if incompatibility causes two or more incompatibilities,
     -- give the line that was just written a line number.
@@ -100,7 +113,7 @@ buildFrom root graph lines =
         Just ( causeId1, causeId2 ) ->
             case ( Graph.get causeId1 graph, Graph.get causeId2 graph ) of
                 ( Just cause1, Just cause2 ) ->
-                    buildFromHelper root cause1.node cause2.node graph lines
+                    buildFromHelper root cause1.node cause2.node model
 
                 _ ->
                     Debug.todo "Both causes nodes should exist"
@@ -109,24 +122,24 @@ buildFrom root graph lines =
             Debug.todo "Should not happen, should not have called recursively on a non derived incompat"
 
 
-buildFromHelper : Node ReportNode -> Node ReportNode -> Node ReportNode -> ReportGraph -> List String -> List String
-buildFromHelper root cause1 cause2 graph lines =
+buildFromHelper : Node ReportNode -> Node ReportNode -> Node ReportNode -> Model -> Model
+buildFromHelper root cause1 cause2 ({ graph, lines } as model) =
     case ( cause1.label.derivedFrom, cause2.label.derivedFrom ) of
         -- 1. If incompatibility is caused by two other derived incompatibilities:
         ( Just ( id11, id12 ), Just ( id21, id22 ) ) ->
             case ( cause1.label.line, cause2.label.line ) of
                 -- 1.i. If both causes already have line numbers:
                 ( Just line1, Just line2 ) ->
-                    "Because cause1 (cause1.line) and cause2 (cause2.line), incompatibility." :: lines
+                    addLine "Because cause1 (cause1.line) and cause2 (cause2.line), incompatibility." model
 
                 -- 1.ii. Otherwise, if only one cause has a line number:
                 ( Just line1, Nothing ) ->
-                    "And because cause1 (cause1.line), incompatibility."
-                        :: buildFrom cause2 graph lines
+                    buildFrom cause2 model
+                        |> addLine "And because cause1 (cause1.line), incompatibility."
 
                 ( Nothing, Just line2 ) ->
-                    "And because cause2 (cause2.line), incompatibility."
-                        :: buildFrom cause1 graph lines
+                    buildFrom cause1 model
+                        |> addLine "And because cause2 (cause2.line), incompatibility."
 
                 -- 1.iii. Otherwise (when neither has a line number):
                 ( Nothing, Nothing ) ->
@@ -134,91 +147,97 @@ buildFromHelper root cause1 cause2 graph lines =
                     if bothExternal id11 id12 graph then
                         -- Beware this will not be correct anymore
                         -- when we also update line numbers in the graph.
-                        ("Thus, " ++ incompatReport " requires " root.label.incompat ++ ".")
-                            :: buildFrom cause1 graph []
-                            ++ buildFrom cause2 graph lines
+                        buildFrom cause2 model
+                            |> buildFrom cause1
+                            |> addLine ("Thus, " ++ incompatReport " requires " root.label.incompat ++ ".")
 
                     else if bothExternal id21 id22 graph then
                         -- Beware this will not be correct anymore
                         -- when we also update line numbers in the graph.
-                        ("Thus, " ++ incompatReport " requires " root.label.incompat ++ ".")
-                            :: buildFrom cause2 graph []
-                            ++ buildFrom cause1 graph lines
+                        buildFrom cause1 model
+                            |> buildFrom cause2
+                            |> addLine ("Thus, " ++ incompatReport " requires " root.label.incompat ++ ".")
 
                     else
                         --- 1.iii.b.
                         -- "And because cause1 (cause1.line), incompatibility."
                         -- TODO: add line
-                        ("And because "
-                            ++ incompatReport " depends on " cause1.label.incompat
-                            ++ ", "
-                            ++ incompatReport " requires " root.label.incompat
-                            ++ "."
-                        )
-                            :: buildFrom cause2 graph []
-                            ++ ("" :: buildFrom cause1 graph lines)
+                        buildFrom cause1 model
+                            |> addLine ""
+                            |> buildFrom cause2
+                            |> addLine
+                                ("And because "
+                                    ++ incompatReport " depends on " cause1.label.incompat
+                                    ++ ", "
+                                    ++ incompatReport " requires " root.label.incompat
+                                    ++ "."
+                                )
 
         -- 2. Otherwise, if only one of incompatibility's causes is another derived incompatibility:
         ( Just derivedFrom, Nothing ) ->
-            reportOneDerivedAndOneExternal root cause1 derivedFrom cause2 graph lines
+            reportOneDerivedAndOneExternal root cause1 derivedFrom cause2 model
 
         ( Nothing, Just derivedFrom ) ->
-            reportOneDerivedAndOneExternal root cause2 derivedFrom cause1 graph lines
+            reportOneDerivedAndOneExternal root cause2 derivedFrom cause1 model
 
         -- 3. Otherwise (when both of incompatibility's causes are external incompatibilities):
         ( Nothing, Nothing ) ->
             -- "Because cause1 and cause2, incompatibility." :: lines
+            addLine
+                ("Because "
+                    ++ incompatReport " depends on " cause1.label.incompat
+                    ++ " and "
+                    ++ incompatReport " depends on " cause2.label.incompat
+                    ++ ", "
+                    ++ incompatReport " requires " root.label.incompat
+                    ++ "."
+                )
+                model
+
+
+reportOneDerivedAndOneExternal : Node ReportNode -> Node ReportNode -> ( Int, Int ) -> Node ReportNode -> Model -> Model
+reportOneDerivedAndOneExternal root derived ( id1, id2 ) external ({ graph, lines } as model) =
+    -- 2.i. If derived already has a line number:
+    if derived.label.line /= Nothing then
+        -- "Because external and derived (derived.line), incompatibility." :: lines
+        addLine
             ("Because "
-                ++ incompatReport " depends on " cause1.label.incompat
+                ++ incompatReport " depends on " external.label.incompat
                 ++ " and "
-                ++ incompatReport " depends on " cause2.label.incompat
+                ++ incompatReport " depends on " derived.label.incompat
                 ++ ", "
                 ++ incompatReport " requires " root.label.incompat
                 ++ "."
             )
-                :: lines
-
-
-reportOneDerivedAndOneExternal : Node ReportNode -> Node ReportNode -> ( Int, Int ) -> Node ReportNode -> ReportGraph -> List String -> List String
-reportOneDerivedAndOneExternal root derived ( id1, id2 ) external graph lines =
-    -- 2.i. If derived already has a line number:
-    if derived.label.line /= Nothing then
-        -- "Because external and derived (derived.line), incompatibility." :: lines
-        ("Because "
-            ++ incompatReport " depends on " external.label.incompat
-            ++ " and "
-            ++ incompatReport " depends on " derived.label.incompat
-            ++ ", "
-            ++ incompatReport " requires " root.label.incompat
-            ++ "."
-        )
-            :: lines
+            model
 
     else
         -- 2.ii. Otherwise, if derived is itself caused by exactly one derived incompatibility and that incompatibility doesn't have a line number:
         case onlyOneDerivedIncompatWithoutLineNumber id1 id2 graph of
             Just ( priorDerived, priorExternal ) ->
                 -- "And because priorExternal and external, incompatibility."
-                ("And because "
-                    ++ incompatReport " depends on " priorExternal.label.incompat
-                    ++ " and "
-                    ++ incompatReport " depends on " external.label.incompat
-                    ++ ", "
-                    ++ incompatReport " requires " root.label.incompat
-                    ++ "."
-                )
-                    :: buildFrom priorDerived graph lines
+                buildFrom priorDerived model
+                    |> addLine
+                        ("And because "
+                            ++ incompatReport " depends on " priorExternal.label.incompat
+                            ++ " and "
+                            ++ incompatReport " depends on " external.label.incompat
+                            ++ ", "
+                            ++ incompatReport " requires " root.label.incompat
+                            ++ "."
+                        )
 
             -- 2.iii. Otherwise
             Nothing ->
                 -- "And because external, incompatibility."
-                ("And because "
-                    ++ incompatReport " depends on " external.label.incompat
-                    ++ ", "
-                    ++ incompatReport " requires " root.label.incompat
-                    ++ "."
-                )
-                    :: buildFrom derived graph lines
+                buildFrom derived model
+                    |> addLine
+                        ("And because "
+                            ++ incompatReport " depends on " external.label.incompat
+                            ++ ", "
+                            ++ incompatReport " requires " root.label.incompat
+                            ++ "."
+                        )
 
 
 
