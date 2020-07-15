@@ -1,10 +1,7 @@
-module DerivationGraph exposing (DerivationGraph, Incompat, fromNodesAndEdges, report, toDot)
+module DerivationGraph exposing (DerivationGraph, Incompat, fromNodesAndEdges, toDot)
 
-import Graph exposing (Edge, Graph, Node, NodeContext)
+import Graph exposing (Edge, Graph, Node)
 import Graph.DOT
-import IntDict exposing (IntDict)
-import Range exposing (Range)
-import Report
 import Term exposing (Term(..))
 
 
@@ -32,22 +29,3 @@ termsString : List ( String, Term ) -> String
 termsString terms =
     List.map (\( name, term ) -> name ++ ": " ++ Term.toDebugString term) terms
         |> String.join ", "
-
-
-report : DerivationGraph -> String
-report derivationGraph =
-    let
-        reportGraph =
-            Graph.mapContexts Report.convertNodeContext derivationGraph
-
-        root =
-            case Graph.get 0 reportGraph of
-                Just { node } ->
-                    node
-
-                Nothing ->
-                    Debug.todo "root node must exist"
-    in
-    Report.buildFrom root reportGraph []
-        |> List.reverse
-        |> String.join "\n"

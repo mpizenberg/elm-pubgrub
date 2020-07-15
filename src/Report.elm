@@ -1,4 +1,4 @@
-module Report exposing (ReportNode, buildFrom, convertNodeContext)
+module Report exposing (ReportNode, convertNodeContext, generate)
 
 import Graph exposing (Graph, Node, NodeContext)
 import IntDict exposing (IntDict)
@@ -72,6 +72,22 @@ initReportNodeContext node incoming outgoing =
 
 
 -- Build the report
+
+
+generate : Int -> ReportGraph -> String
+generate rootId graph =
+    let
+        root =
+            case Graph.get rootId graph of
+                Just { node } ->
+                    node
+
+                Nothing ->
+                    Debug.todo "root node must exist"
+    in
+    buildFrom root graph []
+        |> List.reverse
+        |> String.join "\n"
 
 
 buildFrom : Node ReportNode -> ReportGraph -> List String -> List String

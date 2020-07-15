@@ -29,9 +29,11 @@ import Assignment
 import Database.Stub as Stub
 import DerivationGraph
 import Dict
+import Graph
 import Incompatibility exposing (Incompatibility)
 import PartialSolution exposing (PartialSolution)
 import Range exposing (Range)
+import Report
 import Term exposing (Term)
 import Version exposing (Version)
 
@@ -292,8 +294,11 @@ conflictResolution incompatChanged root incompat model =
             _ =
                 Debug.log (DerivationGraph.toDot derivationGraph) ""
 
+            reportGraph =
+                Graph.mapContexts Report.convertNodeContext derivationGraph
+
             explanation =
-                DerivationGraph.report derivationGraph
+                Report.generate 0 reportGraph
 
             _ =
                 Debug.log ("Textual explanation:\n" ++ explanation) ""
