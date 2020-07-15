@@ -123,23 +123,44 @@ buildFrom root ({ graph } as model) =
 
 
 buildFromHelper : Node ReportNode -> Node ReportNode -> Node ReportNode -> Model -> Model
-buildFromHelper root cause1 cause2 ({ graph, lines } as model) =
+buildFromHelper root cause1 cause2 ({ graph } as model) =
     case ( cause1.label.derivedFrom, cause2.label.derivedFrom ) of
         -- 1. If incompatibility is caused by two other derived incompatibilities:
         ( Just ( id11, id12 ), Just ( id21, id22 ) ) ->
             case ( cause1.label.line, cause2.label.line ) of
                 -- 1.i. If both causes already have line numbers:
                 ( Just line1, Just line2 ) ->
-                    addLine "Because cause1 (cause1.line) and cause2 (cause2.line), incompatibility." model
+                    addLine
+                        ("Because "
+                            ++ incompatReport " depends on " cause1.label.incompat
+                            ++ (" (" ++ String.fromInt line1 ++ ") and ")
+                            ++ incompatReport " depends on " cause2.label.incompat
+                            ++ (" (" ++ String.fromInt line2 ++ "), ")
+                            ++ incompatReport " requires " root.label.incompat
+                            ++ "."
+                        )
+                        model
 
                 -- 1.ii. Otherwise, if only one cause has a line number:
                 ( Just line1, Nothing ) ->
                     buildFrom cause2 model
-                        |> addLine "And because cause1 (cause1.line), incompatibility."
+                        |> addLine
+                            ("And because "
+                                ++ incompatReport " depends on " cause1.label.incompat
+                                ++ (" (" ++ String.fromInt line1 ++ "), ")
+                                ++ incompatReport " requires " root.label.incompat
+                                ++ "."
+                            )
 
                 ( Nothing, Just line2 ) ->
                     buildFrom cause1 model
-                        |> addLine "And because cause2 (cause2.line), incompatibility."
+                        |> addLine
+                            ("And because "
+                                ++ incompatReport " depends on " cause2.label.incompat
+                                ++ (" (" ++ String.fromInt line2 ++ "), ")
+                                ++ incompatReport " requires " root.label.incompat
+                                ++ "."
+                            )
 
                 -- 1.iii. Otherwise (when neither has a line number):
                 ( Nothing, Nothing ) ->
