@@ -285,13 +285,18 @@ conflictResolution incompatChanged root incompat model =
             _ =
                 Debug.log ("Model partial solution:" ++ PartialSolution.toDebugString model.partialSolution) ""
 
-            derivationGraphString =
+            derivationGraph =
                 Incompatibility.derivationNodesAndEdges incompat
                     |> DerivationGraph.fromNodesAndEdges
-                    |> DerivationGraph.toDot
 
             _ =
-                Debug.log derivationGraphString ""
+                Debug.log (DerivationGraph.toDot derivationGraph) ""
+
+            explanation =
+                DerivationGraph.report derivationGraph
+
+            _ =
+                Debug.log ("Textual explanation:\n" ++ explanation) ""
         in
         Err reportError
 

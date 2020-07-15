@@ -1,9 +1,10 @@
-module DerivationGraph exposing (DerivationGraph, Incompat, fromNodesAndEdges, toDot)
+module DerivationGraph exposing (DerivationGraph, Incompat, fromNodesAndEdges, report, toDot)
 
 import Graph exposing (Edge, Graph, Node, NodeContext)
 import Graph.DOT
 import IntDict exposing (IntDict)
-import Term exposing (Term)
+import Range exposing (Range)
+import Term exposing (Term(..))
 
 
 type alias DerivationGraph =
@@ -81,6 +82,25 @@ initReportContextNode node incoming outgoing =
     }
 
 
+report : DerivationGraph -> String
+report derivationGraph =
+    let
+        reportGraph =
+            toReportGraph derivationGraph
+
+        root =
+            case Graph.get 0 reportGraph of
+                Just { node } ->
+                    node
+
+                Nothing ->
+                    Debug.todo "root node must exist"
+    in
+    reportError root reportGraph []
+        |> List.reverse
+        |> String.join "\n"
+
+
 reportError : Node ReportNode -> ReportGraph -> List String -> List String
 reportError root graph lines =
     -- TODO:
@@ -125,33 +145,49 @@ reportErrorCore root cause1 cause2 graph lines =
                     if bothExternal id11 id12 graph then
                         -- Beware this will not be correct anymore
                         -- when we also update line numbers in the graph.
-                        "Thus, incompatibility."
+                        ("Thus, " ++ incompatReport " requires " root.label.incompat ++ ".")
                             :: reportError cause1 graph []
                             ++ reportError cause2 graph lines
 
                     else if bothExternal id21 id22 graph then
                         -- Beware this will not be correct anymore
                         -- when we also update line numbers in the graph.
-                        "Thus, incompatibility."
+                        ("Thus, " ++ incompatReport " requires " root.label.incompat ++ ".")
                             :: reportError cause2 graph []
                             ++ reportError cause1 graph lines
 
                     else
                         --- 1.iii.b.
-                        "And because cause1 (cause1.line), incompatibility."
+                        -- "And because cause1 (cause1.line), incompatibility."
+                        -- TODO: add line
+                        ("And because "
+                            ++ incompatReport " depends on " cause1.label.incompat
+                            ++ ", "
+                            ++ incompatReport " requires " root.label.incompat
+                            ++ "."
+                        )
                             :: reportError cause2 graph []
                             ++ ("" :: reportError cause1 graph lines)
 
         -- 2. Otherwise, if only one of incompatibility's causes is another derived incompatibility:
         ( Just derivedFrom, Nothing ) ->
-            reportOneDerivedAndOneExternal cause1 derivedFrom cause2 graph lines
+            reportOneDerivedAndOneExternal root cause1 derivedFrom cause2 graph lines
 
         ( Nothing, Just derivedFrom ) ->
-            reportOneDerivedAndOneExternal cause2 derivedFrom cause1 graph lines
+            reportOneDerivedAndOneExternal root cause2 derivedFrom cause1 graph lines
 
         -- 3. Otherwise (when both of incompatibility's causes are external incompatibilities):
         ( Nothing, Nothing ) ->
-            "Because cause1 and cause2, incompatibility." :: lines
+            -- "Because cause1 and cause2, incompatibility." :: lines
+            ("Because "
+                ++ incompatReport " depends on " cause1.label.incompat
+                ++ " and "
+                ++ incompatReport " depends on " cause2.label.incompat
+                ++ ", "
+                ++ incompatReport " requires " root.label.incompat
+                ++ "."
+            )
+                :: lines
 
 
 bothExternal : Int -> Int -> ReportGraph -> Bool
@@ -165,22 +201,45 @@ bothExternal id1 id2 graph =
             Debug.todo "Both nodes should exist"
 
 
-reportOneDerivedAndOneExternal : Node ReportNode -> ( Int, Int ) -> Node ReportNode -> ReportGraph -> List String -> List String
-reportOneDerivedAndOneExternal derived ( id1, id2 ) external graph lines =
+reportOneDerivedAndOneExternal : Node ReportNode -> Node ReportNode -> ( Int, Int ) -> Node ReportNode -> ReportGraph -> List String -> List String
+reportOneDerivedAndOneExternal root derived ( id1, id2 ) external graph lines =
     -- 2.i. If derived already has a line number:
     if derived.label.line /= Nothing then
-        "Because external and derived (derived.line), incompatibility." :: lines
+        -- "Because external and derived (derived.line), incompatibility." :: lines
+        ("Because "
+            ++ incompatReport " depends on " external.label.incompat
+            ++ " and "
+            ++ incompatReport " depends on " derived.label.incompat
+            ++ ", "
+            ++ incompatReport " requires " root.label.incompat
+            ++ "."
+        )
+            :: lines
 
     else
         -- 2.ii. Otherwise, if derived is itself caused by exactly one derived incompatibility and that incompatibility doesn't have a line number:
         case onlyOneDerivedIncompatWithoutLineNumber id1 id2 graph of
             Just ( priorDerived, priorExternal ) ->
-                "And because priorExternal and external, incompatibility."
+                -- "And because priorExternal and external, incompatibility."
+                ("And because "
+                    ++ incompatReport " depends on " priorExternal.label.incompat
+                    ++ " and "
+                    ++ incompatReport " depends on " external.label.incompat
+                    ++ ", "
+                    ++ incompatReport " requires " root.label.incompat
+                    ++ "."
+                )
                     :: reportError priorDerived graph lines
 
             -- 2.iii. Otherwise
             Nothing ->
-                "And because external, incompatibility."
+                -- "And because external, incompatibility."
+                ("And because "
+                    ++ incompatReport " depends on " external.label.incompat
+                    ++ ", "
+                    ++ incompatReport " requires " root.label.incompat
+                    ++ "."
+                )
                     :: reportError derived graph lines
 
 
@@ -208,3 +267,35 @@ onlyOneDerivedIncompatWithoutLineNumber id1 id2 graph =
 
         _ ->
             Debug.todo "Both nodes should exist"
+
+
+
+-- Textual report
+
+
+incompatReport : String -> Incompat -> String
+incompatReport liaison incompat =
+    case incompat of
+        ( package, Positive range ) :: ( dependency, Negative depRange ) :: [] ->
+            dependenceReport package range liaison dependency depRange
+
+        ( dependency, Negative depRange ) :: ( package, Positive range ) :: [] ->
+            dependenceReport package range liaison dependency depRange
+
+        ( package, Positive range ) :: [] ->
+            package ++ " " ++ Range.toDebugString range ++ " is impossible"
+
+        ( package, Negative range ) :: [] ->
+            package ++ " " ++ Range.toDebugString range ++ " is mandatory"
+
+        _ ->
+            List.map (\( p, t ) -> p ++ " " ++ Term.toDebugString t) incompat
+                |> String.join ", "
+                |> (\terms -> terms ++ " are incompatible")
+
+
+dependenceReport : String -> Range -> String -> String -> Range -> String
+dependenceReport package range liaison dependency depRange =
+    (package ++ " " ++ Range.toDebugString range)
+        ++ liaison
+        ++ (dependency ++ " " ++ Range.toDebugString depRange)
