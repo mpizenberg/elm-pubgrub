@@ -15,14 +15,14 @@ import Version exposing (Version)
 -}
 getDependencies : String -> Version -> Maybe (List ( String, Range ))
 getDependencies =
-    getDependencies5
+    getDependencies6
 
 
 {-| Get the list of available versions for a given package.
 -}
 listAvailableVersions : String -> List Version
 listAvailableVersions =
-    listAvailableVersions5
+    listAvailableVersions6
 
 
 
