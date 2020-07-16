@@ -105,10 +105,6 @@ generate rootId graph =
 
 buildFrom : Node ReportNode -> Model -> Model
 buildFrom root ({ graph } as model) =
-    -- TODO:
-    -- Finally, if incompatibility causes two or more incompatibilities,
-    -- give the line that was just written a line number.
-    -- Set this as incompatibility's line number.
     case root.label.derivedFrom of
         Just ( causeId1, causeId2 ) ->
             case ( Graph.get causeId1 graph, Graph.get causeId2 graph ) of
@@ -167,15 +163,11 @@ buildFromHelper root cause1 cause2 ({ graph } as model) =
                 ( Nothing, Nothing ) ->
                     --- 1.iii.a.
                     if bothExternal id11 id12 graph then
-                        -- Beware this will not be correct anymore
-                        -- when we also update line numbers in the graph.
                         buildFrom cause2 model
                             |> buildFrom cause1
                             |> addLine ("Thus, " ++ incompatReport " requires " root.label.incompat ++ ".")
 
                     else if bothExternal id21 id22 graph then
-                        -- Beware this will not be correct anymore
-                        -- when we also update line numbers in the graph.
                         buildFrom cause1 model
                             |> buildFrom cause2
                             |> addLine ("Thus, " ++ incompatReport " requires " root.label.incompat ++ ".")
