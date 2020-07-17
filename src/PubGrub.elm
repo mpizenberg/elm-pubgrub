@@ -33,7 +33,6 @@ import Graph
 import Incompatibility exposing (Incompatibility)
 import PartialSolution exposing (PartialSolution)
 import Range exposing (Range)
-import Report
 import ReportBis
 import Term exposing (Term)
 import Version exposing (Version)
@@ -288,27 +287,11 @@ conflictResolution incompatChanged root incompat model =
             _ =
                 Debug.log ("Model partial solution:" ++ PartialSolution.toDebugString model.partialSolution) ""
 
-            derivationGraph =
-                Incompatibility.derivationNodesAndEdges incompat
-                    |> DerivationGraph.fromNodesAndEdges
-
-            _ =
-                Debug.log (DerivationGraph.toDot derivationGraph) ""
-
-            reportGraph =
-                Graph.mapContexts Report.convertNodeContext derivationGraph
-
             explanation =
-                Report.generate 0 reportGraph
-
-            _ =
-                Debug.log ("Textual explanation:\n" ++ explanation) ""
-
-            explanationBis =
                 ReportBis.generate (Incompatibility.toReportTree incompat)
 
             _ =
-                Debug.log ("Textual explanation (bis):\n" ++ explanationBis) ""
+                Debug.log ("Textual explanation (bis):\n" ++ explanation) ""
         in
         Err reportError
 
