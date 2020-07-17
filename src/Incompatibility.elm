@@ -36,9 +36,8 @@ This module provides functions to work with incompatibilities.
 
 import AssocList
 import Dict exposing (Dict)
-import Graph exposing (Edge, Node)
 import Range exposing (Range)
-import ReportBis
+import Report
 import Term exposing (Term)
 import Version exposing (Version)
 
@@ -353,12 +352,12 @@ relationStep set incompat relationAccum =
 
 
 type alias SharedSet =
-    AssocList.Dict ReportBis.Incompat ()
+    AssocList.Dict Report.Incompat ()
 
 
 {-| Convert an incompatibility into a tree useful for error reporting.
 -}
-toReportTree : Incompatibility -> ReportBis.Tree
+toReportTree : Incompatibility -> Report.Tree
 toReportTree incompat =
     let
         ( _, shared ) =
@@ -385,7 +384,7 @@ sharedNodes (Incompatibility { asList } kind) seenAndShared =
             seenAndShared
 
 
-toReportTreeHelper : SharedSet -> Incompatibility -> ReportBis.Tree
+toReportTreeHelper : SharedSet -> Incompatibility -> Report.Tree
 toReportTreeHelper shared (Incompatibility { asList } kind) =
     case kind of
         DerivedFrom i1 i2 ->
@@ -396,7 +395,7 @@ toReportTreeHelper shared (Incompatibility { asList } kind) =
                 t2 =
                     toReportTreeHelper shared i2
             in
-            ReportBis.Derived
+            Report.Derived
                 { incompat = asList
                 , shared = AssocList.member asList shared
                 , cause1 = t1
@@ -404,4 +403,4 @@ toReportTreeHelper shared (Incompatibility { asList } kind) =
                 }
 
         _ ->
-            ReportBis.External asList
+            Report.External asList

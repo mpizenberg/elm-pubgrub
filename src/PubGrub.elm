@@ -27,13 +27,11 @@ by Martin Gebser, Roland Kaminski, Benjamin Kaufmann and Torsten Schaub.
 
 import Assignment
 import Database.Stub as Stub
-import DerivationGraph
 import Dict
-import Graph
 import Incompatibility exposing (Incompatibility)
 import PartialSolution exposing (PartialSolution)
 import Range exposing (Range)
-import ReportBis
+import Report
 import Term exposing (Term)
 import Version exposing (Version)
 
@@ -288,10 +286,10 @@ conflictResolution incompatChanged root incompat model =
                 Debug.log ("Model partial solution:" ++ PartialSolution.toDebugString model.partialSolution) ""
 
             explanation =
-                ReportBis.generate (Incompatibility.toReportTree incompat)
+                Report.generate (Incompatibility.toReportTree incompat)
 
             _ =
-                Debug.log ("Textual explanation (bis):\n" ++ explanation) ""
+                Debug.log ("Textual explanation:\n" ++ explanation) ""
         in
         Err reportError
 

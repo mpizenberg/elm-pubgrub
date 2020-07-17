@@ -1,4 +1,4 @@
-module ReportBis exposing (DerivedIncompat, Incompat, Tree(..), generate)
+module Report exposing (DerivedIncompat, Incompat, Tree(..), generate)
 
 {-| We give a ref number to a line either:
 
