@@ -34,6 +34,7 @@ import Incompatibility exposing (Incompatibility)
 import PartialSolution exposing (PartialSolution)
 import Range exposing (Range)
 import Report
+import ReportBis
 import Term exposing (Term)
 import Version exposing (Version)
 
@@ -302,6 +303,12 @@ conflictResolution incompatChanged root incompat model =
 
             _ =
                 Debug.log ("Textual explanation:\n" ++ explanation) ""
+
+            explanationBis =
+                ReportBis.generate (Incompatibility.toReportTree incompat)
+
+            _ =
+                Debug.log ("Textual explanation (bis):\n" ++ explanationBis) ""
         in
         Err reportError
 

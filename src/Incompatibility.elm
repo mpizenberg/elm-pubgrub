@@ -3,6 +3,7 @@ module Incompatibility exposing
     , merge, priorCause
     , Relation(..), relation
     , DerivationNode, DerivationEdge, derivationNodesAndEdges
+    , toReportTree
     , isTerminal
     )
 
@@ -27,6 +28,8 @@ This module provides functions to work with incompatibilities.
 
 @docs DerivationNode, DerivationEdge, derivationNodesAndEdges
 
+@docs toReportTree
+
 
 # Other helper functions
 
@@ -34,9 +37,11 @@ This module provides functions to work with incompatibilities.
 
 -}
 
+import AssocList
 import Dict exposing (Dict)
 import Graph exposing (Edge, Node)
 import Range exposing (Range)
+import ReportBis
 import Term exposing (Term)
 import Version exposing (Version)
 
@@ -409,3 +414,62 @@ nodesAndEdgesRec count (Incompatibility { asList } kind) parentId ( nodes, edges
 
         _ ->
             ( count, Node count asList :: nodes, Edge parentId count () :: edges )
+
+
+
+-- Error reporting (bis)
+
+
+type alias SharedSet =
+    AssocList.Dict ReportBis.Incompat ()
+
+
+{-| Convert an incompatibility into a tree useful for error reporting.
+-}
+toReportTree : Incompatibility -> ReportBis.Tree
+toReportTree incompat =
+    let
+        ( _, shared ) =
+            sharedNodes incompat ( AssocList.empty, AssocList.empty )
+    in
+    toReportTreeHelper shared incompat
+
+
+sharedNodes : Incompatibility -> ( SharedSet, SharedSet ) -> ( SharedSet, SharedSet )
+sharedNodes (Incompatibility { asList } kind) seenAndShared =
+    case kind of
+        DerivedFrom i1 i2 ->
+            let
+                ( seen, shared ) =
+                    sharedNodes i1 (sharedNodes i2 seenAndShared)
+            in
+            if AssocList.member asList seen then
+                ( seen, AssocList.insert asList () shared )
+
+            else
+                ( AssocList.insert asList () seen, shared )
+
+        _ ->
+            seenAndShared
+
+
+toReportTreeHelper : SharedSet -> Incompatibility -> ReportBis.Tree
+toReportTreeHelper shared (Incompatibility { asList } kind) =
+    case kind of
+        DerivedFrom i1 i2 ->
+            let
+                t1 =
+                    toReportTreeHelper shared i1
+
+                t2 =
+                    toReportTreeHelper shared i2
+            in
+            ReportBis.Derived
+                { incompat = asList
+                , shared = AssocList.member asList shared
+                , cause1 = t1
+                , cause2 = t2
+                }
+
+        _ ->
+            ReportBis.External asList
