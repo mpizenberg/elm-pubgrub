@@ -2,6 +2,7 @@ module Incompatibility exposing
     ( Incompatibility, asDict, notRoot, noVersion, fromDependencies, toDebugString
     , merge, priorCause
     , Relation(..), relation
+    , toReportTree
     , isTerminal
     )
 
@@ -22,14 +23,21 @@ This module provides functions to work with incompatibilities.
 @docs Relation, relation
 
 
+# Error reporting
+
+@docs toReportTree
+
+
 # Other helper functions
 
 @docs isTerminal
 
 -}
 
+import AssocList
 import Dict exposing (Dict)
 import Range exposing (Range)
+import Report
 import Term exposing (Term)
 import Version exposing (Version)
 
@@ -178,6 +186,8 @@ toDebugString recursiveDepth indent (Incompatibility { asList } kind) =
                 ++ ("\n" ++ toDebugString (recursiveDepth - 1) (indent + 3) cause2)
 
 
+{-| Incompatibility terms as a printable string.
+-}
 termsString : List ( String, Term ) -> String
 termsString terms =
     List.map (\( name, term ) -> name ++ ": " ++ Term.toDebugString term) terms
@@ -335,3 +345,62 @@ relationStep set incompat relationAccum =
 
                         _ ->
                             relationStep set otherIncompats Inconclusive
+
+
+
+-- Error reporting
+
+
+type alias SharedSet =
+    AssocList.Dict Report.Incompat ()
+
+
+{-| Convert an incompatibility into a tree useful for error reporting.
+-}
+toReportTree : Incompatibility -> Report.Tree
+toReportTree incompat =
+    let
+        ( _, shared ) =
+            sharedNodes incompat ( AssocList.empty, AssocList.empty )
+    in
+    toReportTreeHelper shared incompat
+
+
+sharedNodes : Incompatibility -> ( SharedSet, SharedSet ) -> ( SharedSet, SharedSet )
+sharedNodes (Incompatibility { asList } kind) seenAndShared =
+    case kind of
+        DerivedFrom i1 i2 ->
+            let
+                ( seen, shared ) =
+                    sharedNodes i1 (sharedNodes i2 seenAndShared)
+            in
+            if AssocList.member asList seen then
+                ( seen, AssocList.insert asList () shared )
+
+            else
+                ( AssocList.insert asList () seen, shared )
+
+        _ ->
+            seenAndShared
+
+
+toReportTreeHelper : SharedSet -> Incompatibility -> Report.Tree
+toReportTreeHelper shared (Incompatibility { asList } kind) =
+    case kind of
+        DerivedFrom i1 i2 ->
+            let
+                t1 =
+                    toReportTreeHelper shared i1
+
+                t2 =
+                    toReportTreeHelper shared i2
+            in
+            Report.Derived
+                { incompat = asList
+                , shared = AssocList.member asList shared
+                , cause1 = t1
+                , cause2 = t2
+                }
+
+        _ ->
+            Report.External asList

@@ -31,6 +31,7 @@ import Dict
 import Incompatibility exposing (Incompatibility)
 import PartialSolution exposing (PartialSolution)
 import Range exposing (Range)
+import Report
 import Term exposing (Term)
 import Version exposing (Version)
 
@@ -283,6 +284,12 @@ conflictResolution incompatChanged root incompat model =
 
             _ =
                 Debug.log ("Model partial solution:" ++ PartialSolution.toDebugString model.partialSolution) ""
+
+            explanation =
+                Report.generate (Incompatibility.toReportTree incompat)
+
+            _ =
+                Debug.log ("Textual explanation:\n" ++ explanation) ""
         in
         Err reportError
 
