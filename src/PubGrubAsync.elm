@@ -1,4 +1,4 @@
-module PubGrubAsync exposing (solve)
+module PubGrubAsync exposing (PackagesConfig, Solution, solveSync)
 
 {-| PubGrub version solving algorithm.
 
@@ -21,133 +21,159 @@ by Martin Gebser, Roland Kaminski, Benjamin Kaufmann and Torsten Schaub.
 [github-pubgrub]: https://github.com/dart-lang/pub/blob/master/doc/solver.md
 [potassco-book]: https://potassco.org/book/
 
-@docs solve
+@docs PackagesConfig, Solution, solveSync
 
 -}
 
-import Database.Stub as Stub
-import Incompatibility exposing (Incompatibility)
-import PartialSolution exposing (PartialSolution)
+import Incompatibility
+import PartialSolution
 import PubGrub
 import Range exposing (Range)
 import Term exposing (Term)
 import Version exposing (Version)
 
 
-type alias Model =
-    { incompatibilities : List Incompatibility
-    , partialSolution : PartialSolution
-    }
+type Model
+    = Solving String PubGrub.Model
+    | Finished (Result String Solution)
 
 
-init : String -> Version -> Model
-init root version =
-    { incompatibilities = [ Incompatibility.notRoot root version ]
-    , partialSolution = PartialSolution.empty
-    }
+{-| Solution of the algorithm containing the list of required packages
+with their version number.
+-}
+type alias Solution =
+    List ( String, Version )
 
 
-setIncompatibilities : List Incompatibility -> Model -> Model
-setIncompatibilities incompatibilities model =
-    { incompatibilities = incompatibilities
-    , partialSolution = model.partialSolution
-    }
+type Msg
+    = NoMsg
+    | Solve String Version
+    | AvailableVersions String Term (List Version)
+    | PackageDependencies String Version (Maybe (List ( String, Range )))
 
 
-mapIncompatibilities : (List Incompatibility -> List Incompatibility) -> Model -> Model
-mapIncompatibilities f { incompatibilities, partialSolution } =
-    { incompatibilities = f incompatibilities
-    , partialSolution = partialSolution
+type Effect
+    = NoEffect
+    | ListVersions ( String, Term )
+    | RetrieveDependencies ( String, Version )
+
+
+{-| Configuration of available packages to solve dependencies.
+-}
+type alias PackagesConfig =
+    { listAvailableVersions : String -> List Version
+    , getDependencies : String -> Version -> Maybe (List ( String, Range ))
     }
 
 
 {-| PubGrub version solving algorithm.
 -}
-solve : String -> Version -> Result String (List ( String, Version ))
-solve root version =
-    solveRec root root (init root version)
+solveSync : PackagesConfig -> String -> Version -> Result String Solution
+solveSync config root version =
+    solveRec root root (PubGrub.init root version)
+        |> updateUntilFinished config
 
 
-solveRec : String -> String -> Model -> Result String (List ( String, Version ))
-solveRec root package model =
-    case PubGrub.unitPropagation root package model of
+updateUntilFinished : PackagesConfig -> ( Model, Effect ) -> Result String Solution
+updateUntilFinished config ( model, effect ) =
+    case model of
+        Solving _ _ ->
+            updateUntilFinished config (update (performSync config effect) model)
+
+        Finished finished ->
+            finished
+
+
+performSync : PackagesConfig -> Effect -> Msg
+performSync config effect =
+    case effect of
+        NoEffect ->
+            NoMsg
+
+        ListVersions ( package, term ) ->
+            AvailableVersions package term (config.listAvailableVersions package)
+
+        RetrieveDependencies ( package, version ) ->
+            config.getDependencies package version
+                |> PackageDependencies package version
+
+
+update : Msg -> Model -> ( Model, Effect )
+update msg model =
+    case ( msg, model ) of
+        ( Solve root version, _ ) ->
+            solveRec root root (PubGrub.init root version)
+
+        ( AvailableVersions package term versions, Solving root pgModel ) ->
+            case PubGrub.pickVersion versions term of
+                Just version ->
+                    ( model, RetrieveDependencies ( package, version ) )
+
+                Nothing ->
+                    let
+                        noVersionIncompat =
+                            Incompatibility.noVersion package term
+
+                        updatedModel =
+                            PubGrub.mapIncompatibilities (Incompatibility.merge noVersionIncompat) pgModel
+                    in
+                    solveRec root package updatedModel
+
+        ( PackageDependencies package version maybeDependencies, Solving root pgModel ) ->
+            case maybeDependencies of
+                Nothing ->
+                    Debug.todo "The package and version should exist!"
+
+                Just deps ->
+                    applyDecision deps package version pgModel
+                        |> solveRec root package
+
+        ( _, Finished _ ) ->
+            ( model, NoEffect )
+
+        _ ->
+            Debug.todo ("This should not happen, " ++ Debug.toString msg ++ "\n" ++ Debug.toString model)
+
+
+applyDecision : List ( String, Range ) -> String -> Version -> PubGrub.Model -> PubGrub.Model
+applyDecision dependencies package version pgModel =
+    let
+        depIncompats =
+            Incompatibility.fromDependencies package version dependencies
+
+        _ =
+            Debug.log ("Add the following " ++ String.fromInt (List.length depIncompats) ++ " incompatibilities from dependencies of " ++ package) ""
+
+        _ =
+            depIncompats
+                |> List.map (\i -> Debug.log (Incompatibility.toDebugString 1 3 i) "")
+
+        updatedIncompatibilities =
+            List.foldr Incompatibility.merge pgModel.incompatibilities depIncompats
+    in
+    case PartialSolution.addVersion package version depIncompats pgModel.partialSolution of
+        Nothing ->
+            PubGrub.setIncompatibilities updatedIncompatibilities pgModel
+
+        Just updatedPartial ->
+            PubGrub.Model updatedIncompatibilities updatedPartial
+
+
+solveRec : String -> String -> PubGrub.Model -> ( Model, Effect )
+solveRec root package pgModel =
+    case PubGrub.unitPropagation root package pgModel of
         Err msg ->
-            Err msg
+            ( Finished (Err msg), NoEffect )
 
         Ok updatedModel ->
-            case makeDecision Stub.listAvailableVersions updatedModel of
+            case PubGrub.pickPackage updatedModel.partialSolution of
                 Nothing ->
-                    PartialSolution.solution updatedModel.partialSolution
-                        |> Result.fromMaybe "Is this possible???"
-
-                Just ( next, updatedAgainModel ) ->
-                    solveRec root next updatedAgainModel
-
-
-makeDecision : (String -> List Version) -> Model -> Maybe ( String, Model )
-makeDecision listAvailableVersions model =
-    case pickPackageVersion model.partialSolution listAvailableVersions of
-        Nothing ->
-            Nothing
-
-        Just (Err ( package, incompat )) ->
-            Just ( package, mapIncompatibilities (Incompatibility.merge incompat) model )
-
-        Just (Ok ( package, version )) ->
-            let
-                dependencies =
-                    case Stub.getDependencies package version of
-                        Just deps ->
-                            deps
+                    case PartialSolution.solution updatedModel.partialSolution of
+                        Just solution ->
+                            ( Finished (Ok solution), NoEffect )
 
                         Nothing ->
-                            Debug.todo "The package and version should exist"
+                            ( Finished (Err "How did we end up with no package to choose but no solution?"), NoEffect )
 
-                depIncompats =
-                    Incompatibility.fromDependencies package version dependencies
-
-                _ =
-                    Debug.log ("Add the following " ++ String.fromInt (List.length depIncompats) ++ " incompatibilities from dependencies of " ++ package) ""
-
-                _ =
-                    depIncompats
-                        |> List.map (\i -> Debug.log (Incompatibility.toDebugString 1 3 i) "")
-
-                updatedIncompatibilities =
-                    List.foldr Incompatibility.merge model.incompatibilities depIncompats
-            in
-            case PartialSolution.addVersion package version depIncompats model.partialSolution of
-                Nothing ->
-                    Just ( package, setIncompatibilities updatedIncompatibilities model )
-
-                Just updatedPartial ->
-                    Just ( package, Model updatedIncompatibilities updatedPartial )
-
-
-{-| Heuristic to pick the next package & version to add to the partial solution.
-This should be a package with a positive derivation but no decision yet.
-If multiple choices are possible, use a heuristic.
-
-Pub chooses the latest matching version of the package
-with the fewest versions that match the outstanding constraint.
-This tends to find conflicts earlier if any exist,
-since these packages will run out of versions to try more quickly.
-But there's likely room for improvement in these heuristics.
-
-Let "term" be the intersection of all assignments in the partial solution
-referring to that package.
-If no version matches that term return an error with
-the package name and the incompatibity {term}.
-
--}
-pickPackageVersion : PartialSolution -> (String -> List Version) -> Maybe (Result ( String, Incompatibility ) ( String, Version ))
-pickPackageVersion partial listAvailableVersions =
-    case PubGrub.pickPackage partial of
-        Just ( package, term ) ->
-            PubGrub.pickVersion (listAvailableVersions package) term
-                |> Maybe.map (Tuple.pair package)
-                |> Result.fromMaybe ( package, Incompatibility.noVersion package term )
-                |> Just
-
-        Nothing ->
-            Nothing
+                Just packageAndTerm ->
+                    ( Solving root updatedModel, ListVersions packageAndTerm )

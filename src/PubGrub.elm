@@ -1,5 +1,6 @@
 module PubGrub exposing
-    ( solve
+    ( Model, solve
+    , init, setIncompatibilities, mapIncompatibilities
     , pickPackage, pickVersion, unitPropagation
     )
 
@@ -24,7 +25,9 @@ by Martin Gebser, Roland Kaminski, Benjamin Kaufmann and Torsten Schaub.
 [github-pubgrub]: https://github.com/dart-lang/pub/blob/master/doc/solver.md
 [potassco-book]: https://potassco.org/book/
 
-@docs solve
+@docs Model, solve
+
+@docs init, setIncompatibilities, mapIncompatibilities
 
 @docs pickPackage, pickVersion, unitPropagation
 
@@ -41,12 +44,16 @@ import Term exposing (Term)
 import Version exposing (Version)
 
 
+{-| PubGrub model.
+-}
 type alias Model =
     { incompatibilities : List Incompatibility
     , partialSolution : PartialSolution
     }
 
 
+{-| PubGrub init.
+-}
 init : String -> Version -> Model
 init root version =
     { incompatibilities = [ Incompatibility.notRoot root version ]
@@ -54,6 +61,8 @@ init root version =
     }
 
 
+{-| PubGrub setIncompatibilities.
+-}
 setIncompatibilities : List Incompatibility -> Model -> Model
 setIncompatibilities incompatibilities model =
     { incompatibilities = incompatibilities
@@ -61,6 +70,8 @@ setIncompatibilities incompatibilities model =
     }
 
 
+{-| PubGrub mapIncompatibilities.
+-}
 mapIncompatibilities : (List Incompatibility -> List Incompatibility) -> Model -> Model
 mapIncompatibilities f { incompatibilities, partialSolution } =
     { incompatibilities = f incompatibilities
