@@ -28,7 +28,7 @@ by Martin Gebser, Roland Kaminski, Benjamin Kaufmann and Torsten Schaub.
 This module contains the core model and functions
 to write a functional PubGrub algorithm.
 
-@docs Model, solve
+@docs Model
 
 @docs init, setIncompatibilities, mapIncompatibilities
 
