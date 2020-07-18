@@ -1,4 +1,7 @@
-module PubGrub exposing (solve)
+module PubGrub exposing
+    ( solve
+    , pickPackage, pickVersion, unitPropagation
+    )
 
 {-| PubGrub version solving algorithm.
 
@@ -22,6 +25,8 @@ by Martin Gebser, Roland Kaminski, Benjamin Kaufmann and Torsten Schaub.
 [potassco-book]: https://potassco.org/book/
 
 @docs solve
+
+@docs pickPackage, pickVersion, unitPropagation
 
 -}
 
@@ -211,6 +216,8 @@ getDependencies package version =
     Debug.todo "Should be implemented lazily"
 
 
+{-| Unit propagation is the core mechanism of the solving algorithm.
+-}
 unitPropagation : String -> String -> Model -> Result String Model
 unitPropagation root package model =
     unitPropagationLoop root "" [ package ] [] model
