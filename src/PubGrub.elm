@@ -1,4 +1,4 @@
-module PubGrubAsync exposing (PackagesConfig, Solution, solveSync)
+module PubGrub exposing (PackagesConfig, Solution, solveSync)
 
 {-| PubGrub version solving algorithm.
 
@@ -20,6 +20,10 @@ by Martin Gebser, Roland Kaminski, Benjamin Kaufmann and Torsten Schaub.
 [medium-pubgrub]: https://medium.com/@nex3/pubgrub-2fb6470504f
 [github-pubgrub]: https://github.com/dart-lang/pub/blob/master/doc/solver.md
 [potassco-book]: https://potassco.org/book/
+
+This module provides both a sync (offline) and
+an async approach (online, may http request)
+for the PubGrub algorithm.
 
 @docs PackagesConfig, Solution, solveSync
 
