@@ -1,5 +1,5 @@
-module PubGrub exposing
-    ( Model, solve
+module PubGrubCore exposing
+    ( Model
     , init, setIncompatibilities, mapIncompatibilities
     , pickPackage, pickVersion, unitPropagation
     )
@@ -25,6 +25,9 @@ by Martin Gebser, Roland Kaminski, Benjamin Kaufmann and Torsten Schaub.
 [github-pubgrub]: https://github.com/dart-lang/pub/blob/master/doc/solver.md
 [potassco-book]: https://potassco.org/book/
 
+This module contains the core model and functions
+to write a functional PubGrub algorithm.
+
 @docs Model, solve
 
 @docs init, setIncompatibilities, mapIncompatibilities
@@ -34,11 +37,9 @@ by Martin Gebser, Roland Kaminski, Benjamin Kaufmann and Torsten Schaub.
 -}
 
 import Assignment
-import Database.Stub as Stub
 import Dict
 import Incompatibility exposing (Incompatibility)
 import PartialSolution exposing (PartialSolution)
-import Range exposing (Range)
 import Report
 import Term exposing (Term)
 import Version exposing (Version)
@@ -86,98 +87,6 @@ mapPartialSolution f { incompatibilities, partialSolution } =
     }
 
 
-{-| PubGrub version solving algorithm.
--}
-solve : String -> Version -> Result String (List ( String, Version ))
-solve root version =
-    solveRec root root (init root version)
-
-
-solveRec : String -> String -> Model -> Result String (List ( String, Version ))
-solveRec root package model =
-    case unitPropagation root package model of
-        Err msg ->
-            Err msg
-
-        Ok updatedModel ->
-            case makeDecision Stub.listAvailableVersions updatedModel of
-                Nothing ->
-                    PartialSolution.solution updatedModel.partialSolution
-                        |> Result.fromMaybe "Is this possible???"
-
-                Just ( next, updatedAgainModel ) ->
-                    solveRec root next updatedAgainModel
-
-
-makeDecision : (String -> List Version) -> Model -> Maybe ( String, Model )
-makeDecision listAvailableVersions model =
-    case pickPackageVersion model.partialSolution listAvailableVersions of
-        Nothing ->
-            Nothing
-
-        Just (Err ( package, incompat )) ->
-            Just ( package, mapIncompatibilities (Incompatibility.merge incompat) model )
-
-        Just (Ok ( package, version )) ->
-            let
-                dependencies =
-                    case Stub.getDependencies package version of
-                        Just deps ->
-                            deps
-
-                        Nothing ->
-                            Debug.todo "The package and version should exist"
-
-                depIncompats =
-                    Incompatibility.fromDependencies package version dependencies
-
-                _ =
-                    Debug.log ("Add the following " ++ String.fromInt (List.length depIncompats) ++ " incompatibilities from dependencies of " ++ package) ""
-
-                _ =
-                    depIncompats
-                        |> List.map (\i -> Debug.log (Incompatibility.toDebugString 1 3 i) "")
-
-                updatedIncompatibilities =
-                    List.foldr Incompatibility.merge model.incompatibilities depIncompats
-            in
-            case PartialSolution.addVersion package version depIncompats model.partialSolution of
-                Nothing ->
-                    Just ( package, setIncompatibilities updatedIncompatibilities model )
-
-                Just updatedPartial ->
-                    Just ( package, Model updatedIncompatibilities updatedPartial )
-
-
-{-| Heuristic to pick the next package & version to add to the partial solution.
-This should be a package with a positive derivation but no decision yet.
-If multiple choices are possible, use a heuristic.
-
-Pub chooses the latest matching version of the package
-with the fewest versions that match the outstanding constraint.
-This tends to find conflicts earlier if any exist,
-since these packages will run out of versions to try more quickly.
-But there's likely room for improvement in these heuristics.
-
-Let "term" be the intersection of all assignments in the partial solution
-referring to that package.
-If no version matches that term return an error with
-the package name and the incompatibity {term}.
-
--}
-pickPackageVersion : PartialSolution -> (String -> List Version) -> Maybe (Result ( String, Incompatibility ) ( String, Version ))
-pickPackageVersion partial listAvailableVersions =
-    case pickPackage partial of
-        Just ( package, term ) ->
-            pickVersion (listAvailableVersions package) term
-                |> Maybe.map (Tuple.pair package)
-                |> Result.fromMaybe ( package, Incompatibility.noVersion package term )
-                |> Just
-
-        Nothing ->
-            Nothing
-
-
 {-| Heuristic to pick the next package to add to the partial solution.
 This should be a package with a positive derivation but no decision yet.
 If multiple choices are possible, use a heuristic.
@@ -220,11 +129,6 @@ pickVersion availableVersions partialSolutionTerm =
 
             else
                 pickVersion others partialSolutionTerm
-
-
-getDependencies : String -> Version -> Maybe (List ( String, Range ))
-getDependencies package version =
-    Debug.todo "Should be implemented lazily"
 
 
 {-| Unit propagation is the core mechanism of the solving algorithm.

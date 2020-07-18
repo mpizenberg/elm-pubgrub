@@ -27,14 +27,14 @@ by Martin Gebser, Roland Kaminski, Benjamin Kaufmann and Torsten Schaub.
 
 import Incompatibility
 import PartialSolution
-import PubGrub
+import PubGrubCore
 import Range exposing (Range)
 import Term exposing (Term)
 import Version exposing (Version)
 
 
 type Model
-    = Solving String PubGrub.Model
+    = Solving String PubGrubCore.Model
     | Finished (Result String Solution)
 
 
@@ -70,7 +70,7 @@ type alias PackagesConfig =
 -}
 solveSync : PackagesConfig -> String -> Version -> Result String Solution
 solveSync config root version =
-    solveRec root root (PubGrub.init root version)
+    solveRec root root (PubGrubCore.init root version)
         |> updateUntilFinished config
 
 
@@ -102,10 +102,10 @@ update : Msg -> Model -> ( Model, Effect )
 update msg model =
     case ( msg, model ) of
         ( Solve root version, _ ) ->
-            solveRec root root (PubGrub.init root version)
+            solveRec root root (PubGrubCore.init root version)
 
         ( AvailableVersions package term versions, Solving root pgModel ) ->
-            case PubGrub.pickVersion versions term of
+            case PubGrubCore.pickVersion versions term of
                 Just version ->
                     ( model, RetrieveDependencies ( package, version ) )
 
@@ -115,7 +115,7 @@ update msg model =
                             Incompatibility.noVersion package term
 
                         updatedModel =
-                            PubGrub.mapIncompatibilities (Incompatibility.merge noVersionIncompat) pgModel
+                            PubGrubCore.mapIncompatibilities (Incompatibility.merge noVersionIncompat) pgModel
                     in
                     solveRec root package updatedModel
 
@@ -135,7 +135,7 @@ update msg model =
             Debug.todo ("This should not happen, " ++ Debug.toString msg ++ "\n" ++ Debug.toString model)
 
 
-applyDecision : List ( String, Range ) -> String -> Version -> PubGrub.Model -> PubGrub.Model
+applyDecision : List ( String, Range ) -> String -> Version -> PubGrubCore.Model -> PubGrubCore.Model
 applyDecision dependencies package version pgModel =
     let
         depIncompats =
@@ -153,20 +153,20 @@ applyDecision dependencies package version pgModel =
     in
     case PartialSolution.addVersion package version depIncompats pgModel.partialSolution of
         Nothing ->
-            PubGrub.setIncompatibilities updatedIncompatibilities pgModel
+            PubGrubCore.setIncompatibilities updatedIncompatibilities pgModel
 
         Just updatedPartial ->
-            PubGrub.Model updatedIncompatibilities updatedPartial
+            PubGrubCore.Model updatedIncompatibilities updatedPartial
 
 
-solveRec : String -> String -> PubGrub.Model -> ( Model, Effect )
+solveRec : String -> String -> PubGrubCore.Model -> ( Model, Effect )
 solveRec root package pgModel =
-    case PubGrub.unitPropagation root package pgModel of
+    case PubGrubCore.unitPropagation root package pgModel of
         Err msg ->
             ( Finished (Err msg), NoEffect )
 
         Ok updatedModel ->
-            case PubGrub.pickPackage updatedModel.partialSolution of
+            case PubGrubCore.pickPackage updatedModel.partialSolution of
                 Nothing ->
                     case PartialSolution.solution updatedModel.partialSolution of
                         Just solution ->

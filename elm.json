@@ -12,6 +12,7 @@
         "Memory",
         "PartialSolution",
         "PubGrub",
+        "PubGrubCore",
         "Range",
         "Term",
         "Version"
