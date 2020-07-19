@@ -300,7 +300,7 @@ tryUpdateCached connectivity (Cache cache) modelAndEffect =
                         Offline ->
                             let
                                 err =
-                                    "Dependencies of " ++ package ++ " at version "
+                                    "Dependencies of " ++ package ++ " " ++ Version.toDebugString version ++ " missing."
                             in
                             ( Finished (Err err), SignalError err )
 

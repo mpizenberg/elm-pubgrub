@@ -121,8 +121,8 @@ buildFromTree tree accum =
         Derived derived ->
             buildFromDerived derived accum
 
-        External _ ->
-            Debug.todo "This should never happen (except if there is a single rule directly saying that root cannot be choosen)"
+        External external ->
+            addLine (explainExternal external) accum
 
 
 buildFromDerived : DerivedIncompat -> Accum -> Accum
@@ -233,6 +233,11 @@ reportRecurseOneEach derived external incompat accum =
 
 
 -- String explanations
+
+
+explainExternal : Incompat -> String
+explainExternal external =
+    incompatReport " requires " external
 
 
 explainBothExternal : Incompat -> Incompat -> Incompat -> String
