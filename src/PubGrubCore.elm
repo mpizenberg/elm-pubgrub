@@ -213,7 +213,7 @@ conflictResolution incompatChanged root incompat model =
             _ =
                 Debug.log ("Textual explanation:\n" ++ explanation) ""
         in
-        Err reportError
+        Err explanation
 
     else
         let
@@ -265,11 +265,6 @@ conflictResolution incompatChanged root incompat model =
                             Debug.log ("   priorCause\n" ++ Incompatibility.toDebugString -1 3 priorCause) ""
                     in
                     conflictResolution True root priorCause model
-
-
-reportError : String
-reportError =
-    "The root package can't be selected, version solving has failed"
 
 
 backtrack : Bool -> Int -> Incompatibility -> Model -> Model

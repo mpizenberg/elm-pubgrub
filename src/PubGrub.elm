@@ -102,7 +102,7 @@ type Effect
     = NoEffect
     | ListVersions ( String, Term )
     | RetrieveDependencies ( String, Version )
-    | SignalError String
+    | SignalEnd (Result String Solution)
 
 
 updateEffect : Msg -> Model -> ( Model, Effect )
@@ -143,17 +143,19 @@ solveRec : String -> String -> PubGrubCore.Model -> ( Model, Effect )
 solveRec root package pgModel =
     case PubGrubCore.unitPropagation root package pgModel of
         Err msg ->
-            ( Finished (Err msg), NoEffect )
+            ( Finished (Err msg), SignalEnd (Err msg) )
 
         Ok updatedModel ->
             case PubGrubCore.pickPackage updatedModel.partialSolution of
                 Nothing ->
                     case PartialSolution.solution updatedModel.partialSolution of
                         Just solution ->
-                            ( Finished (Ok solution), NoEffect )
+                            ( Finished (Ok solution), SignalEnd (Ok solution) )
 
                         Nothing ->
-                            ( Finished (Err "How did we end up with no package to choose but no solution?"), NoEffect )
+                            ( Finished (Err "How did we end up with no package to choose but no solution?")
+                            , SignalEnd (Err "How did we end up with no package to choose but no solution?")
+                            )
 
                 Just packageAndTerm ->
                     ( Solving root updatedModel, ListVersions packageAndTerm )
@@ -226,7 +228,7 @@ performSync config effect =
             config.getDependencies package version
                 |> PackageDependencies package version
 
-        SignalError _ ->
+        SignalEnd _ ->
             -- ? not sure
             NoMsg
 
@@ -274,6 +276,9 @@ tryUpdateCached connectivity (Cache cache) modelAndEffect =
         ( _, NoEffect ) ->
             modelAndEffect
 
+        ( Finished _, _ ) ->
+            modelAndEffect
+
         ( model, ListVersions ( package, term ) ) ->
             case connectivity of
                 Online ->
@@ -284,6 +289,7 @@ tryUpdateCached connectivity (Cache cache) modelAndEffect =
                         versions =
                             Dict.get package cache.packages
                                 |> Maybe.withDefault []
+                                |> filterVersionsWithDependencies package cache.dependencies
 
                         msg =
                             AvailableVersions package term versions
@@ -302,11 +308,12 @@ tryUpdateCached connectivity (Cache cache) modelAndEffect =
                                 err =
                                     "Dependencies of " ++ package ++ " " ++ Version.toDebugString version ++ " missing."
                             in
-                            ( Finished (Err err), SignalError err )
+                            ( Finished (Err err), SignalEnd (Err err) )
 
                 Just deps ->
                     applyDecision deps package version pgModel
                         |> solveRec root package
+                        |> tryUpdateCached connectivity (Cache cache)
 
         _ ->
             Debug.todo "This should not happen?"
@@ -324,6 +331,15 @@ type Cache
         , packages : Dict String (List Version)
         , dependencies : Dict ( String, ( Int, Int, Int ) ) (List ( String, Range ))
         }
+
+
+filterVersionsWithDependencies :
+    String
+    -> Dict ( String, ( Int, Int, Int ) ) (List ( String, Range ))
+    -> List Version
+    -> List Version
+filterVersionsWithDependencies package dependencies versions =
+    List.filter (\version -> Dict.member ( package, Version.toTuple version ) dependencies) versions
 
 
 {-| Initial empty cache.
