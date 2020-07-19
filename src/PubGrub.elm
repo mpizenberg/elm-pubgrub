@@ -1,8 +1,9 @@
 module PubGrub exposing
     ( Solution
     , PackagesConfig, solve
+    , Model, Effect(..), Msg(..)
+    , Connectivity(..), init, update
     , Cache, emptyCache, cacheDependencies, cachePackageVersions
-    , init, update
     )
 
 {-| PubGrub version solving algorithm.
@@ -44,8 +45,9 @@ The core of the algorithm is in the PubGrubCore module.
 
 # Async
 
+@docs Model, Effect, Msg
+@docs Connectivity, init, update
 @docs Cache, emptyCache, cacheDependencies, cachePackageVersions
-@docs init, update
 
 -}
 
@@ -63,6 +65,8 @@ import Version exposing (Version)
 -- Common parts for both sync and async
 
 
+{-| Internal model of the PubGrub algorithm.
+-}
 type Model
     = Solving String PubGrubCore.Model
     | Finished (Result String Solution)
@@ -75,16 +79,30 @@ type alias Solution =
     List ( String, Version )
 
 
+{-| Messages used to progress in the algorithm.
+
+You should pick the one you need depending on the last effect emitted.
+For example, the `ListVersions` effect is asking you to retrieve
+available versions for a given package.
+Once done, inform PubGrub with the `AvailableVersions` message
+(and pass around the `Term` value).
+
+-}
 type Msg
     = NoMsg
     | AvailableVersions String Term (List Version)
     | PackageDependencies String Version (Maybe (List ( String, Range )))
 
 
+{-| Those are the effects required by the PubGrub algorithm.
+Once emitted, they may require you to retrieve some data,
+and then send the adequate message to the algorithm.
+-}
 type Effect
     = NoEffect
     | ListVersions ( String, Term )
     | RetrieveDependencies ( String, Version )
+    | SignalError String
 
 
 updateEffect : Msg -> Model -> ( Model, Effect )
@@ -208,21 +226,90 @@ performSync config effect =
             config.getDependencies package version
                 |> PackageDependencies package version
 
+        SignalError _ ->
+            -- ? not sure
+            NoMsg
+
 
 
 -- ASYNC #############################################################
 
 
-init : Cache -> String -> Version -> ( Model, Effect )
-init cache root version =
-    -- TODO: use cache
+{-| Online or Offline.
+
+In Offline mode, the `ListVersions` effect is never emitted
+because we never know if a new version or not may be available,
+and thus if the cache contains or not all available versions.
+It will always use the list of versions available in cache.
+
+In Offline mode, the `RetrieveDependencies` effect is never emitted.
+Either the dependencies are known and it will continue,
+or they aren't and it will signal a failure.
+
+-}
+type Connectivity
+    = Online
+    | Offline
+
+
+{-| Initialize PubGrub algorithm.
+-}
+init : Connectivity -> Cache -> String -> Version -> ( Model, Effect )
+init connectivity cache root version =
     solveRec root root (PubGrubCore.init root version)
+        |> tryUpdateCached connectivity cache
 
 
-update : Cache -> Msg -> Model -> ( Model, Effect )
-update cache msg model =
-    -- TODO: use cache
+{-| Update the state of the PubGrub algorithm.
+-}
+update : Connectivity -> Cache -> Msg -> Model -> ( Model, Effect )
+update connectivity cache msg model =
     updateEffect msg model
+        |> tryUpdateCached connectivity cache
+
+
+tryUpdateCached : Connectivity -> Cache -> ( Model, Effect ) -> ( Model, Effect )
+tryUpdateCached connectivity (Cache cache) modelAndEffect =
+    case modelAndEffect of
+        ( _, NoEffect ) ->
+            modelAndEffect
+
+        ( model, ListVersions ( package, term ) ) ->
+            case connectivity of
+                Online ->
+                    modelAndEffect
+
+                Offline ->
+                    let
+                        versions =
+                            Dict.get package cache.packages
+                                |> Maybe.withDefault []
+
+                        msg =
+                            AvailableVersions package term versions
+                    in
+                    update connectivity (Cache cache) msg model
+
+        ( Solving root pgModel, RetrieveDependencies ( package, version ) ) ->
+            case Dict.get ( package, Version.toTuple version ) cache.dependencies of
+                Nothing ->
+                    case connectivity of
+                        Online ->
+                            modelAndEffect
+
+                        Offline ->
+                            let
+                                err =
+                                    "Dependencies of " ++ package ++ " at version "
+                            in
+                            ( Finished (Err err), SignalError err )
+
+                Just deps ->
+                    applyDecision deps package version pgModel
+                        |> solveRec root package
+
+        _ ->
+            Debug.todo "This should not happen?"
 
 
 
