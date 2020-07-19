@@ -1,6 +1,8 @@
 module PubGrub exposing
     ( Solution
-    , PackagesConfig, solveSync
+    , PackagesConfig, solve
+    , Cache, emptyCache, cacheDependencies, cachePackageVersions
+    , init, update
     )
 
 {-| PubGrub version solving algorithm.
@@ -37,15 +39,18 @@ The core of the algorithm is in the PubGrubCore module.
 
 # Sync
 
-@docs PackagesConfig, solveSync
+@docs PackagesConfig, solve
 
 
 # Async
 
-To do
+@docs Cache, emptyCache, cacheDependencies, cachePackageVersions
+@docs init, update
 
 -}
 
+import Array exposing (Array)
+import Dict exposing (Dict)
 import Incompatibility
 import PartialSolution
 import PubGrubCore
@@ -72,7 +77,6 @@ type alias Solution =
 
 type Msg
     = NoMsg
-    | Solve String Version
     | AvailableVersions String Term (List Version)
     | PackageDependencies String Version (Maybe (List ( String, Range )))
 
@@ -83,12 +87,9 @@ type Effect
     | RetrieveDependencies ( String, Version )
 
 
-update : Msg -> Model -> ( Model, Effect )
-update msg model =
+updateEffect : Msg -> Model -> ( Model, Effect )
+updateEffect msg model =
     case ( msg, model ) of
-        ( Solve root version, _ ) ->
-            solveRec root root (PubGrubCore.init root version)
-
         ( AvailableVersions package term versions, Solving root pgModel ) ->
             case PubGrubCore.pickVersion versions term of
                 Just version ->
@@ -178,8 +179,8 @@ type alias PackagesConfig =
 
 {-| PubGrub version solving algorithm.
 -}
-solveSync : PackagesConfig -> String -> Version -> Result String Solution
-solveSync config root version =
+solve : PackagesConfig -> String -> Version -> Result String Solution
+solve config root version =
     solveRec root root (PubGrubCore.init root version)
         |> updateUntilFinished config
 
@@ -188,7 +189,7 @@ updateUntilFinished : PackagesConfig -> ( Model, Effect ) -> Result String Solut
 updateUntilFinished config ( model, effect ) =
     case model of
         Solving _ _ ->
-            updateUntilFinished config (update (performSync config effect) model)
+            updateUntilFinished config (updateEffect (performSync config effect) model)
 
         Finished finished ->
             finished
@@ -210,3 +211,87 @@ performSync config effect =
 
 
 -- ASYNC #############################################################
+
+
+init : Cache -> String -> Version -> ( Model, Effect )
+init cache root version =
+    -- TODO: use cache
+    solveRec root root (PubGrubCore.init root version)
+
+
+update : Cache -> Msg -> Model -> ( Model, Effect )
+update cache msg model =
+    -- TODO: use cache
+    updateEffect msg model
+
+
+
+-- Cache
+
+
+{-| Cache holding already loaded packages information.
+-}
+type Cache
+    = Cache
+        { packagesRaw : Array ( String, Version )
+        , packages : Dict String (List Version)
+        , dependencies : Dict ( String, ( Int, Int, Int ) ) (List ( String, Range ))
+        }
+
+
+{-| Initial empty cache.
+-}
+emptyCache : Cache
+emptyCache =
+    Cache
+        { packagesRaw = Array.empty
+        , packages = Dict.empty
+        , dependencies = Dict.empty
+        }
+
+
+{-| Add dependencies of a package to the cache.
+-}
+cacheDependencies : String -> Version -> List ( String, Range ) -> Cache -> Cache
+cacheDependencies package version deps (Cache cache) =
+    if Dict.member ( package, Version.toTuple version ) cache.dependencies then
+        Cache cache
+
+    else
+        Cache { cache | dependencies = Dict.insert ( package, Version.toTuple version ) deps cache.dependencies }
+
+
+{-| Add a list of packages and versions to the cache.
+-}
+cachePackageVersions : List ( String, Version ) -> Cache -> Cache
+cachePackageVersions packagesVersions (Cache { packagesRaw, packages, dependencies }) =
+    let
+        ( updatedRaw, updatePackages ) =
+            List.foldl addPackageVersion ( packagesRaw, packages ) packagesVersions
+    in
+    Cache
+        { packagesRaw = updatedRaw
+        , packages = updatePackages
+        , dependencies = dependencies
+        }
+
+
+addPackageVersion :
+    ( String, Version )
+    -> ( Array ( String, Version ), Dict String (List Version) )
+    -> ( Array ( String, Version ), Dict String (List Version) )
+addPackageVersion ( package, version ) ( raw, packages ) =
+    case Dict.get package packages of
+        Nothing ->
+            ( Array.push ( package, version ) raw
+            , Dict.insert package [ version ] packages
+            )
+
+        Just versions ->
+            if List.member version versions then
+                ( raw, packages )
+
+            else
+                ( Array.push ( package, version ) raw
+                , Dict.update package (Maybe.map ((::) version)) packages
+                )
