@@ -1,7 +1,7 @@
 module PubGrub exposing
     ( Solution
     , PackagesConfig, solve
-    , State, Effect(..), Msg(..)
+    , State, stateToString, Effect(..), effectToString, Msg(..)
     , Connectivity(..), init, update
     , Cache, emptyCache, cacheDependencies, cachePackageVersions
     )
@@ -45,7 +45,7 @@ The core of the algorithm is in the PubGrubCore module.
 
 # Async
 
-@docs State, Effect, Msg
+@docs State, stateToString, Effect, effectToString, Msg
 @docs Connectivity, init, update
 @docs Cache, emptyCache, cacheDependencies, cachePackageVersions
 
@@ -69,6 +69,30 @@ import Version exposing (Version)
 -}
 type State
     = State { root : String, pgModel : PubGrubCore.Model }
+
+
+
+-- { incompatibilities : List Incompatibility
+-- , partialSolution : PartialSolution
+
+
+{-| Convert a state into a printable string (for human reading).
+-}
+stateToString : State -> String
+stateToString (State { pgModel }) =
+    let
+        partialSolution =
+            PartialSolution.toDebugString pgModel.partialSolution
+
+        incompatibilities =
+            pgModel.incompatibilities
+                |> List.map (Incompatibility.toDebugString 1 0)
+                |> String.join "\n"
+    in
+    "Partial solution at this stage:\n\n"
+        ++ partialSolution
+        ++ "\n\nSet of incompatibilities:\n\n"
+        ++ incompatibilities
 
 
 {-| Solution of the algorithm containing the list of required packages
@@ -102,6 +126,32 @@ type Effect
     | ListVersions ( String, Term )
     | RetrieveDependencies ( String, Version )
     | SignalEnd (Result String Solution)
+
+
+{-| Convert an effect into a printable string (for human reading).
+-}
+effectToString : Effect -> String
+effectToString effect =
+    case effect of
+        NoEffect ->
+            "No effect"
+
+        ListVersions ( package, _ ) ->
+            "List existing versions of package " ++ package
+
+        RetrieveDependencies ( package, version ) ->
+            "Retrieve the list of dependencies of package "
+                ++ package
+                ++ " at version "
+                ++ Version.toDebugString version
+
+        SignalEnd result ->
+            case result of
+                Ok _ ->
+                    "Solving terminated succesfully"
+
+                Err _ ->
+                    "Solving terminated with an error"
 
 
 updateEffect : Msg -> State -> ( State, Effect )
