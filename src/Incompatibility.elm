@@ -1,5 +1,5 @@
 module Incompatibility exposing
-    ( Incompatibility, asDict, notRoot, noVersion, fromDependencies, toDebugString
+    ( Incompatibility, asDict, notRoot, noVersion, unavailableDeps, fromDependencies, toDebugString
     , merge, priorCause
     , Relation(..), relation
     , toReportTree
@@ -10,7 +10,7 @@ module Incompatibility exposing
 be satisfied all together.
 This module provides functions to work with incompatibilities.
 
-@docs Incompatibility, asDict, notRoot, noVersion, fromDependencies, toDebugString
+@docs Incompatibility, asDict, notRoot, noVersion, unavailableDeps, fromDependencies, toDebugString
 
 
 # Composition of incompatibilities
@@ -63,16 +63,6 @@ Both a temporally ordered list of terms,
 and an organized dictionary of packages are useful
 at different moments in the PubGrub algorithm.
 
-TODO: Derived incompat with more than one term and has a positive term
-referring to root and containing initial version:
-Pub is normalizing those by removing the root package
-which will always be satisfied.
-
-TODO: Maybe the unknown kind should be extracted into
-an Incompatibility variant NoVersion.
-And the FromDependencyOf and DerivedFrom would be sub variants
-of an IncompatibilityTree variant.
-
 -}
 type Incompatibility
     = Incompatibility { asDict : Dict String Term, asList : List ( String, Term ) } Kind
@@ -88,6 +78,7 @@ until I figure out how to get rid of this case.
 type Kind
     = NotRoot
     | NoVersion
+    | UnavailableDependencies String Version
     | FromDependencyOf String Version
     | DerivedFrom Incompatibility Incompatibility
 
@@ -154,6 +145,20 @@ noVersion package term =
     Incompatibility { asDict = Dict.singleton package term, asList = [ ( package, term ) ] } NoVersion
 
 
+{-| Create an incompatibility to remember that a package version
+is not selectable because its list of dependencies is unavailable.
+-}
+unavailableDeps : String -> Version -> Incompatibility
+unavailableDeps package version =
+    let
+        term =
+            Term.Positive (Range.exact version)
+    in
+    Incompatibility
+        { asDict = Dict.singleton package term, asList = [ ( package, term ) ] }
+        (UnavailableDependencies package version)
+
+
 
 -- Debug
 
@@ -176,6 +181,9 @@ toDebugString recursiveDepth indent (Incompatibility { asList } kind) =
 
         ( _, NoVersion ) ->
             String.repeat indent " " ++ termsString asList ++ "  <<<  no version"
+
+        ( _, UnavailableDependencies _ _ ) ->
+            String.repeat indent " " ++ termsString asList ++ "  <<<  unavailable dependencies"
 
         ( 1, DerivedFrom _ _ ) ->
             String.repeat indent " " ++ termsString asList ++ "  <<<  derived"
@@ -251,7 +259,9 @@ they're collapsed together into the single incompatibility {foo ^1.0.0, not bar 
 (provided that no other version of foo exists between 1.0.0 and 2.0.0).
 
 Here we do the simple stupid thing of just growing the list.
-TODO: improve this.
+TODO: improve this. It may not be trivial since those incompatibilities
+may already have derived others.
+Maybe this should not be persued.
 
 -}
 merge : Incompatibility -> List Incompatibility -> List Incompatibility
@@ -264,16 +274,8 @@ the terms in the incompatibility and the terms in the satisfier's cause
 minus the terms referring to satisfier's package.
 -}
 priorCause : Incompatibility -> Incompatibility -> Incompatibility
-priorCause ((Incompatibility cause k1) as i1) ((Incompatibility incompat k2) as i2) =
-    case ( k1, k2 ) of
-        ( NoVersion, _ ) ->
-            union cause.asDict incompat.asDict k2
-
-        ( _, NoVersion ) ->
-            union cause.asDict incompat.asDict k1
-
-        _ ->
-            union cause.asDict incompat.asDict (DerivedFrom i1 i2)
+priorCause ((Incompatibility cause _) as i1) ((Incompatibility incompat _) as i2) =
+    union cause.asDict incompat.asDict (DerivedFrom i1 i2)
 
 
 {-| Union of all terms in two incompatibilities.
@@ -402,5 +404,14 @@ toReportTreeHelper shared (Incompatibility { asList } kind) =
                 , cause2 = t2
                 }
 
-        _ ->
-            Report.External asList
+        NoVersion ->
+            Report.External asList Report.NoVersion
+
+        UnavailableDependencies _ _ ->
+            Report.External asList Report.UnavailableDependencies
+
+        FromDependencyOf _ _ ->
+            Report.External asList Report.Dependencies
+
+        NotRoot ->
+            Debug.todo "This should not appear in the report tree"

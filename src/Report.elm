@@ -1,4 +1,4 @@
-module Report exposing (DerivedIncompat, Incompat, Tree(..), generate)
+module Report exposing (DerivedIncompat, Incompat, Kind(..), Tree(..), generate)
 
 {-| We give a ref number to a line either:
 
@@ -22,7 +22,13 @@ import Term exposing (Term(..))
 
 type Tree
     = Derived DerivedIncompat
-    | External Incompat
+    | External Incompat Kind
+
+
+type Kind
+    = NoVersion
+    | UnavailableDependencies
+    | Dependencies
 
 
 type alias DerivedIncompat =
@@ -121,8 +127,8 @@ buildFromTree tree accum =
         Derived derived ->
             buildFromDerived derived accum
 
-        External _ ->
-            Debug.todo "This should never happen (except if there is a single rule directly saying that root cannot be choosen)"
+        External external kind ->
+            addLine (explainExternal external kind) accum
 
 
 buildFromDerived : DerivedIncompat -> Accum -> Accum
@@ -138,18 +144,18 @@ buildFromDerived derived accum =
 buildFromHelper : DerivedIncompat -> Accum -> Accum
 buildFromHelper ({ incompat, cause1, cause2 } as current) accum =
     case ( cause1, cause2 ) of
-        ( External external1, External external2 ) ->
+        ( External external1 k1, External external2 k2 ) ->
             -- Simplest case, we just combine two external incompatibilities.
-            addLine (explainBothExternal external1 external2 incompat) accum
+            addLine (explainBothExternal external1 k1 external2 k2 incompat) accum
 
-        ( Derived derived, External external ) ->
+        ( Derived derived, External external kind ) ->
             -- One cause is derived, so we explain this first
             -- then we add the external part
             -- and finally conclude with the current incompatibility.
-            reportOneEach derived external incompat accum
+            reportOneEach derived external kind incompat accum
 
-        ( External external, Derived derived ) ->
-            reportOneEach derived external incompat accum
+        ( External external kind, Derived derived ) ->
+            reportOneEach derived external kind incompat accum
 
         ( Derived derived1, Derived derived2 ) ->
             -- This is the most complex case since both causes are also derived.
@@ -203,44 +209,49 @@ The result will depend on the fact that the derived incompatibility
 has already been explained or not.
 
 -}
-reportOneEach : DerivedIncompat -> Incompat -> Incompat -> Accum -> Accum
-reportOneEach derived external incompat accum =
+reportOneEach : DerivedIncompat -> Incompat -> Kind -> Incompat -> Accum -> Accum
+reportOneEach derived external kind incompat accum =
     case getLineRef derived accum of
         Just ref ->
-            addLine (explainRefAndExternal ref derived.incompat external incompat) accum
+            addLine (explainRefAndExternal ref derived.incompat external kind incompat) accum
 
         Nothing ->
-            reportRecurseOneEach derived external incompat accum
+            reportRecurseOneEach derived external kind incompat accum
 
 
 {-| Report one derived (without a line ref yet) and one external.
 -}
-reportRecurseOneEach : DerivedIncompat -> Incompat -> Incompat -> Accum -> Accum
-reportRecurseOneEach derived external incompat accum =
+reportRecurseOneEach : DerivedIncompat -> Incompat -> Kind -> Incompat -> Accum -> Accum
+reportRecurseOneEach derived external kind incompat accum =
     case ( derived.cause1, derived.cause2 ) of
-        ( Derived priorDerived, External priorExternal ) ->
+        ( Derived priorDerived, External priorExternal pKind ) ->
             buildFromDerived priorDerived accum
-                |> addLine (andExplainPriorAndExternal priorExternal external incompat)
+                |> addLine (andExplainPriorAndExternal priorExternal pKind external kind incompat)
 
-        ( External priorExternal, Derived priorDerived ) ->
+        ( External priorExternal pKind, Derived priorDerived ) ->
             buildFromDerived priorDerived accum
-                |> addLine (andExplainPriorAndExternal priorExternal external incompat)
+                |> addLine (andExplainPriorAndExternal priorExternal pKind external kind incompat)
 
         _ ->
             buildFromDerived derived accum
-                |> addLine (andExplainExternal external incompat)
+                |> addLine (andExplainExternal external kind incompat)
 
 
 
 -- String explanations
 
 
-explainBothExternal : Incompat -> Incompat -> Incompat -> String
-explainBothExternal external1 external2 consequence =
+explainExternal : Incompat -> Kind -> String
+explainExternal external kind =
+    externalReport " requires " external kind
+
+
+explainBothExternal : Incompat -> Kind -> Incompat -> Kind -> Incompat -> String
+explainBothExternal external1 k1 external2 k2 consequence =
     "Because "
-        ++ incompatReport " depends on " external1
+        ++ externalReport " depends on " external1 k1
         ++ " and "
-        ++ incompatReport " depends on " external2
+        ++ externalReport " depends on " external2 k2
         ++ ", "
         ++ incompatReport " requires " consequence
         ++ "."
@@ -257,10 +268,10 @@ explainBothRef ref1 derived1 ref2 derived2 consequence =
         ++ "."
 
 
-explainRefAndExternal : Int -> Incompat -> Incompat -> Incompat -> String
-explainRefAndExternal ref derived external consequence =
+explainRefAndExternal : Int -> Incompat -> Incompat -> Kind -> Incompat -> String
+explainRefAndExternal ref derived external kind consequence =
     "Because "
-        ++ incompatReport " depends on " external
+        ++ externalReport " depends on " external kind
         ++ " and "
         ++ incompatReport " depends on " derived
         ++ (" (" ++ String.fromInt ref ++ "), ")
@@ -268,10 +279,10 @@ explainRefAndExternal ref derived external consequence =
         ++ "."
 
 
-andExplainExternal : Incompat -> Incompat -> String
-andExplainExternal external consequence =
+andExplainExternal : Incompat -> Kind -> Incompat -> String
+andExplainExternal external kind consequence =
     "And because "
-        ++ incompatReport " depends on " external
+        ++ externalReport " depends on " external kind
         ++ ", "
         ++ incompatReport " requires " consequence
         ++ "."
@@ -286,12 +297,12 @@ andExplainRef ref derived consequence =
         ++ "."
 
 
-andExplainPriorAndExternal : Incompat -> Incompat -> Incompat -> String
-andExplainPriorAndExternal priorExternal external consequence =
+andExplainPriorAndExternal : Incompat -> Kind -> Incompat -> Kind -> Incompat -> String
+andExplainPriorAndExternal priorExternal pKind external kind consequence =
     "And because "
-        ++ incompatReport " depends on " priorExternal
+        ++ externalReport " depends on " priorExternal pKind
         ++ " and "
-        ++ incompatReport " depends on " external
+        ++ externalReport " depends on " external kind
         ++ ", "
         ++ incompatReport " requires " consequence
         ++ "."
@@ -299,6 +310,19 @@ andExplainPriorAndExternal priorExternal external consequence =
 
 
 -- Textual representation of an incompatibility
+
+
+externalReport : String -> Incompat -> Kind -> String
+externalReport liaison incompat kind =
+    case kind of
+        NoVersion ->
+            incompatReport liaison incompat ++ " (no version)"
+
+        UnavailableDependencies ->
+            incompatReport liaison incompat ++ " (dependencies unavailable)"
+
+        _ ->
+            incompatReport liaison incompat
 
 
 incompatReport : String -> Incompat -> String
@@ -315,6 +339,9 @@ incompatReport liaison incompat =
 
         ( package, Negative range ) :: [] ->
             package ++ " " ++ Range.toDebugString range ++ " is mandatory"
+
+        [] ->
+            "no package can be selected"
 
         _ ->
             List.map (\( p, t ) -> p ++ " " ++ Term.toDebugString t) incompat
