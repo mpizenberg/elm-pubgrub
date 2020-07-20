@@ -332,15 +332,6 @@ type Cache
         }
 
 
-filterVersionsWithDependencies :
-    String
-    -> Dict ( String, ( Int, Int, Int ) ) (List ( String, Range ))
-    -> List Version
-    -> List Version
-filterVersionsWithDependencies package dependencies versions =
-    List.filter (\version -> Dict.member ( package, Version.toTuple version ) dependencies) versions
-
-
 {-| Initial empty cache.
 -}
 emptyCache : Cache
