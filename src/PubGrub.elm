@@ -1,7 +1,7 @@
 module PubGrub exposing
     ( Solution
     , PackagesConfig, solve
-    , Model, Effect(..), Msg(..)
+    , State, Effect(..), Msg(..)
     , Connectivity(..), init, update
     , Cache, emptyCache, cacheDependencies, cachePackageVersions
     )
@@ -45,7 +45,7 @@ The core of the algorithm is in the PubGrubCore module.
 
 # Async
 
-@docs Model, Effect, Msg
+@docs State, Effect, Msg
 @docs Connectivity, init, update
 @docs Cache, emptyCache, cacheDependencies, cachePackageVersions
 
@@ -67,8 +67,8 @@ import Version exposing (Version)
 
 {-| Internal model of the PubGrub algorithm.
 -}
-type Model
-    = Solving String PubGrubCore.Model
+type State
+    = State { root : String, pgModel : PubGrubCore.Model }
 
 
 {-| Solution of the algorithm containing the list of required packages
@@ -104,13 +104,13 @@ type Effect
     | SignalEnd (Result String Solution)
 
 
-updateEffect : Msg -> Model -> ( Model, Effect )
-updateEffect msg model =
-    case ( msg, model ) of
-        ( AvailableVersions package term versions, Solving root pgModel ) ->
+updateEffect : Msg -> State -> ( State, Effect )
+updateEffect msg ((State { root, pgModel }) as state) =
+    case msg of
+        AvailableVersions package term versions ->
             case PubGrubCore.pickVersion versions term of
                 Just version ->
-                    ( model, RetrieveDependencies ( package, version ) )
+                    ( state, RetrieveDependencies ( package, version ) )
 
                 Nothing ->
                     let
@@ -122,7 +122,7 @@ updateEffect msg model =
                     in
                     solveRec root package updatedModel
 
-        ( PackageDependencies package version maybeDependencies, Solving root pgModel ) ->
+        PackageDependencies package version maybeDependencies ->
             case maybeDependencies of
                 Nothing ->
                     Debug.todo "The package and version should exist!"
@@ -131,30 +131,30 @@ updateEffect msg model =
                     applyDecision deps package version pgModel
                         |> solveRec root package
 
-        ( NoMsg, _ ) ->
-            ( model, NoEffect )
+        NoMsg ->
+            ( state, NoEffect )
 
 
-solveRec : String -> String -> PubGrubCore.Model -> ( Model, Effect )
+solveRec : String -> String -> PubGrubCore.Model -> ( State, Effect )
 solveRec root package pgModel =
     case PubGrubCore.unitPropagation root package pgModel of
         Err msg ->
-            ( Solving package pgModel, SignalEnd (Err msg) )
+            ( State { root = root, pgModel = pgModel }, SignalEnd (Err msg) )
 
         Ok updatedModel ->
             case PubGrubCore.pickPackage updatedModel.partialSolution of
                 Nothing ->
                     case PartialSolution.solution updatedModel.partialSolution of
                         Just solution ->
-                            ( Solving package updatedModel, SignalEnd (Ok solution) )
+                            ( State { root = root, pgModel = updatedModel }, SignalEnd (Ok solution) )
 
                         Nothing ->
-                            ( Solving package updatedModel
+                            ( State { root = root, pgModel = updatedModel }
                             , SignalEnd (Err "How did we end up with no package to choose but no solution?")
                             )
 
                 Just packageAndTerm ->
-                    ( Solving root updatedModel, ListVersions packageAndTerm )
+                    ( State { root = root, pgModel = updatedModel }, ListVersions packageAndTerm )
 
 
 applyDecision : List ( String, Range ) -> String -> Version -> PubGrubCore.Model -> PubGrubCore.Model
@@ -201,14 +201,14 @@ solve config root version =
         |> updateUntilFinished config
 
 
-updateUntilFinished : PackagesConfig -> ( Model, Effect ) -> Result String Solution
-updateUntilFinished config ( model, effect ) =
+updateUntilFinished : PackagesConfig -> ( State, Effect ) -> Result String Solution
+updateUntilFinished config ( state, effect ) =
     case effect of
         SignalEnd result ->
             result
 
         _ ->
-            updateUntilFinished config (updateEffect (performSync config effect) model)
+            updateUntilFinished config (updateEffect (performSync config effect) state)
 
 
 performSync : PackagesConfig -> Effect -> Msg
@@ -252,7 +252,7 @@ type Connectivity
 
 {-| Initialize PubGrub algorithm.
 -}
-init : Connectivity -> Cache -> String -> Version -> ( Model, Effect )
+init : Connectivity -> Cache -> String -> Version -> ( State, Effect )
 init connectivity cache root version =
     solveRec root root (PubGrubCore.init root version)
         |> tryUpdateCached connectivity cache
@@ -260,25 +260,25 @@ init connectivity cache root version =
 
 {-| Update the state of the PubGrub algorithm.
 -}
-update : Connectivity -> Cache -> Msg -> Model -> ( Model, Effect )
+update : Connectivity -> Cache -> Msg -> State -> ( State, Effect )
 update connectivity cache msg model =
     updateEffect msg model
         |> tryUpdateCached connectivity cache
 
 
-tryUpdateCached : Connectivity -> Cache -> ( Model, Effect ) -> ( Model, Effect )
-tryUpdateCached connectivity (Cache cache) modelAndEffect =
-    case modelAndEffect of
+tryUpdateCached : Connectivity -> Cache -> ( State, Effect ) -> ( State, Effect )
+tryUpdateCached connectivity (Cache cache) stateAndEffect =
+    case stateAndEffect of
         ( _, NoEffect ) ->
-            modelAndEffect
+            stateAndEffect
 
         ( _, SignalEnd _ ) ->
-            modelAndEffect
+            stateAndEffect
 
         ( model, ListVersions ( package, term ) ) ->
             case connectivity of
                 Online ->
-                    modelAndEffect
+                    stateAndEffect
 
                 Offline ->
                     let
@@ -292,19 +292,19 @@ tryUpdateCached connectivity (Cache cache) modelAndEffect =
                     in
                     update connectivity (Cache cache) msg model
 
-        ( Solving root pgModel, RetrieveDependencies ( package, version ) ) ->
+        ( State { root, pgModel }, RetrieveDependencies ( package, version ) ) ->
             case Dict.get ( package, Version.toTuple version ) cache.dependencies of
                 Nothing ->
                     case connectivity of
                         Online ->
-                            modelAndEffect
+                            stateAndEffect
 
                         Offline ->
                             let
                                 err =
                                     "Dependencies of " ++ package ++ " " ++ Version.toDebugString version ++ " missing."
                             in
-                            ( Solving package pgModel, SignalEnd (Err err) )
+                            ( State { root = root, pgModel = pgModel }, SignalEnd (Err err) )
 
                 Just deps ->
                     applyDecision deps package version pgModel
