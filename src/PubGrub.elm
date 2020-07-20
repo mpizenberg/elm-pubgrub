@@ -65,7 +65,7 @@ import Version exposing (Version)
 -- Common parts for both sync and async
 
 
-{-| Internal model of the PubGrub algorithm.
+{-| Internal state of the PubGrub algorithm.
 -}
 type State
     = State { root : String, pgModel : PubGrubCore.Model }
@@ -268,8 +268,8 @@ init connectivity cache root version =
 {-| Update the state of the PubGrub algorithm.
 -}
 update : Connectivity -> Cache -> Msg -> State -> ( State, Effect )
-update connectivity cache msg model =
-    updateEffect msg model
+update connectivity cache msg state =
+    updateEffect msg state
         |> tryUpdateCached connectivity cache
 
 
@@ -282,7 +282,7 @@ tryUpdateCached connectivity (Cache cache) stateAndEffect =
         ( _, SignalEnd _ ) ->
             stateAndEffect
 
-        ( model, ListVersions ( package, term ) ) ->
+        ( state, ListVersions ( package, term ) ) ->
             case connectivity of
                 Online ->
                     stateAndEffect
@@ -296,7 +296,7 @@ tryUpdateCached connectivity (Cache cache) stateAndEffect =
                         msg =
                             AvailableVersions package term versions
                     in
-                    update connectivity (Cache cache) msg model
+                    update connectivity (Cache cache) msg state
 
         ( (State { root, pgModel }) as state, RetrieveDependencies ( package, version ) ) ->
             case Dict.get ( package, Version.toTuple version ) cache.dependencies of
