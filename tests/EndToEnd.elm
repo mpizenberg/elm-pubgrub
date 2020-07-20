@@ -96,3 +96,16 @@ branchingErrorReporting =
                 "root"
                 Version.one
                 |> Expect.err
+
+
+transitiveDependencyToIncompatibleRoot : Test
+transitiveDependencyToIncompatibleRoot =
+    Test.test "Should pass even if a wrong transitive dependency tries to depend on root 2.0.0" <|
+        \_ ->
+            PubGrub.solve
+                { listAvailableVersions = Stub.listAvailableVersions7
+                , getDependencies = Stub.getDependencies7
+                }
+                "root"
+                Version.one
+                |> Expect.ok
