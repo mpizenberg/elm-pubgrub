@@ -1,5 +1,5 @@
 module Incompatibility exposing
-    ( Incompatibility, asDict, notRoot, noVersion, fromDependencies, toDebugString
+    ( Incompatibility, asDict, notRoot, noVersion, unavailableDeps, fromDependencies, toDebugString
     , merge, priorCause
     , Relation(..), relation
     , toReportTree
@@ -10,7 +10,7 @@ module Incompatibility exposing
 be satisfied all together.
 This module provides functions to work with incompatibilities.
 
-@docs Incompatibility, asDict, notRoot, noVersion, fromDependencies, toDebugString
+@docs Incompatibility, asDict, notRoot, noVersion, unavailableDeps, fromDependencies, toDebugString
 
 
 # Composition of incompatibilities
@@ -88,6 +88,7 @@ until I figure out how to get rid of this case.
 type Kind
     = NotRoot
     | NoVersion
+    | UnavailableDependencies String Version
     | FromDependencyOf String Version
     | DerivedFrom Incompatibility Incompatibility
 
@@ -154,6 +155,20 @@ noVersion package term =
     Incompatibility { asDict = Dict.singleton package term, asList = [ ( package, term ) ] } NoVersion
 
 
+{-| Create an incompatibility to remember that a package version
+is not selectable because its list of dependencies is unavailable.
+-}
+unavailableDeps : String -> Version -> Incompatibility
+unavailableDeps package version =
+    let
+        term =
+            Term.Positive (Range.exact version)
+    in
+    Incompatibility
+        { asDict = Dict.singleton package term, asList = [ ( package, term ) ] }
+        (UnavailableDependencies package version)
+
+
 
 -- Debug
 
@@ -176,6 +191,9 @@ toDebugString recursiveDepth indent (Incompatibility { asList } kind) =
 
         ( _, NoVersion ) ->
             String.repeat indent " " ++ termsString asList ++ "  <<<  no version"
+
+        ( _, UnavailableDependencies _ _ ) ->
+            String.repeat indent " " ++ termsString asList ++ "  <<<  unavailable dependencies"
 
         ( 1, DerivedFrom _ _ ) ->
             String.repeat indent " " ++ termsString asList ++ "  <<<  derived"

@@ -125,7 +125,14 @@ updateEffect msg ((State { root, pgModel }) as state) =
         PackageDependencies package version maybeDependencies ->
             case maybeDependencies of
                 Nothing ->
-                    Debug.todo "The package and version should exist!"
+                    let
+                        unavailableDepsIncompat =
+                            Incompatibility.unavailableDeps package version
+
+                        updatedModel =
+                            PubGrubCore.mapIncompatibilities (Incompatibility.merge unavailableDepsIncompat) pgModel
+                    in
+                    solveRec root package updatedModel
 
                 Just deps ->
                     applyDecision deps package version pgModel
@@ -285,14 +292,13 @@ tryUpdateCached connectivity (Cache cache) stateAndEffect =
                         versions =
                             Dict.get package cache.packages
                                 |> Maybe.withDefault []
-                                |> filterVersionsWithDependencies package cache.dependencies
 
                         msg =
                             AvailableVersions package term versions
                     in
                     update connectivity (Cache cache) msg model
 
-        ( State { root, pgModel }, RetrieveDependencies ( package, version ) ) ->
+        ( (State { root, pgModel }) as state, RetrieveDependencies ( package, version ) ) ->
             case Dict.get ( package, Version.toTuple version ) cache.dependencies of
                 Nothing ->
                     case connectivity of
@@ -301,10 +307,10 @@ tryUpdateCached connectivity (Cache cache) stateAndEffect =
 
                         Offline ->
                             let
-                                err =
-                                    "Dependencies of " ++ package ++ " " ++ Version.toDebugString version ++ " missing."
+                                msg =
+                                    PackageDependencies package version Nothing
                             in
-                            ( State { root = root, pgModel = pgModel }, SignalEnd (Err err) )
+                            update connectivity (Cache cache) msg state
 
                 Just deps ->
                     applyDecision deps package version pgModel
