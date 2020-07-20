@@ -16,6 +16,10 @@ with the following caracteristics, not only Elm packages.
    - stricly lower version (`foo 1.0.0 depends on bar < 2.0.0`)
    - ranges of versions (`foo 1.0.0 depends on bar 1.0.0 <= v < 2.0.0`)
 
+PS: at publication, only the `PubGrub`, `Version`, `Range`, and `Term`
+modules will be exposed.
+Others are exposed for easy docs usage at the moment.
+
 
 ## API
 
