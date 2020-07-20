@@ -282,16 +282,8 @@ the terms in the incompatibility and the terms in the satisfier's cause
 minus the terms referring to satisfier's package.
 -}
 priorCause : Incompatibility -> Incompatibility -> Incompatibility
-priorCause ((Incompatibility cause k1) as i1) ((Incompatibility incompat k2) as i2) =
-    case ( k1, k2 ) of
-        ( NoVersion, _ ) ->
-            union cause.asDict incompat.asDict k2
-
-        ( _, NoVersion ) ->
-            union cause.asDict incompat.asDict k1
-
-        _ ->
-            union cause.asDict incompat.asDict (DerivedFrom i1 i2)
+priorCause ((Incompatibility cause _) as i1) ((Incompatibility incompat _) as i2) =
+    union cause.asDict incompat.asDict (DerivedFrom i1 i2)
 
 
 {-| Union of all terms in two incompatibilities.
