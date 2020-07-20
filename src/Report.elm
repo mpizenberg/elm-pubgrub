@@ -321,6 +321,9 @@ incompatReport liaison incompat =
         ( package, Negative range ) :: [] ->
             package ++ " " ++ Range.toDebugString range ++ " is mandatory"
 
+        [] ->
+            "no package can be selected"
+
         _ ->
             List.map (\( p, t ) -> p ++ " " ++ Term.toDebugString t) incompat
                 |> String.join ", "
