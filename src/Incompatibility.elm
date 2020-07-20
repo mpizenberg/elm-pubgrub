@@ -412,5 +412,14 @@ toReportTreeHelper shared (Incompatibility { asList } kind) =
                 , cause2 = t2
                 }
 
-        _ ->
-            Report.External asList
+        NoVersion ->
+            Report.External asList Report.NoVersion
+
+        UnavailableDependencies _ _ ->
+            Report.External asList Report.UnavailableDependencies
+
+        FromDependencyOf _ _ ->
+            Report.External asList Report.Dependencies
+
+        NotRoot ->
+            Debug.todo "This should not appear in the report tree"
