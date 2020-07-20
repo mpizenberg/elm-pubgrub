@@ -3,7 +3,6 @@ module PubGrub exposing
     , PackagesConfig, solve
     , State, stateToString, Effect(..), effectToString, Msg(..)
     , Connectivity(..), init, update
-    , Cache, emptyCache, cacheDependencies, cachePackageVersions
     )
 
 {-| PubGrub version solving algorithm.
@@ -105,12 +104,10 @@ when the `SignalEnd result` effect is emitted.
 
 @docs State, stateToString, Effect, effectToString, Msg
 @docs Connectivity, init, update
-@docs Cache, emptyCache, cacheDependencies, cachePackageVersions
 
 -}
 
-import Array exposing (Array)
-import Dict exposing (Dict)
+import Cache exposing (Cache)
 import Incompatibility
 import PartialSolution
 import PubGrubCore
@@ -382,7 +379,7 @@ update connectivity cache msg state =
 
 
 tryUpdateCached : Connectivity -> Cache -> ( State, Effect ) -> ( State, Effect )
-tryUpdateCached connectivity (Cache cache) stateAndEffect =
+tryUpdateCached connectivity cache stateAndEffect =
     case stateAndEffect of
         ( _, NoEffect ) ->
             stateAndEffect
@@ -398,16 +395,15 @@ tryUpdateCached connectivity (Cache cache) stateAndEffect =
                 Offline ->
                     let
                         versions =
-                            Dict.get package cache.packages
-                                |> Maybe.withDefault []
+                            Cache.listVersions package cache
 
                         msg =
                             AvailableVersions package term versions
                     in
-                    update connectivity (Cache cache) msg state
+                    update connectivity cache msg state
 
         ( (State { root, pgModel }) as state, RetrieveDependencies ( package, version ) ) ->
-            case Dict.get ( package, Version.toTuple version ) cache.dependencies of
+            case Cache.listDependencies package version cache of
                 Nothing ->
                     case connectivity of
                         Online ->
@@ -418,81 +414,9 @@ tryUpdateCached connectivity (Cache cache) stateAndEffect =
                                 msg =
                                     PackageDependencies package version Nothing
                             in
-                            update connectivity (Cache cache) msg state
+                            update connectivity cache msg state
 
                 Just deps ->
                     applyDecision deps package version pgModel
                         |> solveRec root package
-                        |> tryUpdateCached connectivity (Cache cache)
-
-
-
--- Cache
-
-
-{-| Cache holding already loaded packages information.
--}
-type Cache
-    = Cache
-        { packagesRaw : Array ( String, Version )
-        , packages : Dict String (List Version)
-        , dependencies : Dict ( String, ( Int, Int, Int ) ) (List ( String, Range ))
-        }
-
-
-{-| Initial empty cache.
--}
-emptyCache : Cache
-emptyCache =
-    Cache
-        { packagesRaw = Array.empty
-        , packages = Dict.empty
-        , dependencies = Dict.empty
-        }
-
-
-{-| Add dependencies of a package to the cache.
--}
-cacheDependencies : String -> Version -> List ( String, Range ) -> Cache -> Cache
-cacheDependencies package version deps (Cache cache) =
-    if Dict.member ( package, Version.toTuple version ) cache.dependencies then
-        Cache cache
-
-    else
-        Cache { cache | dependencies = Dict.insert ( package, Version.toTuple version ) deps cache.dependencies }
-
-
-{-| Add a list of packages and versions to the cache.
--}
-cachePackageVersions : List ( String, Version ) -> Cache -> Cache
-cachePackageVersions packagesVersions (Cache { packagesRaw, packages, dependencies }) =
-    let
-        ( updatedRaw, updatePackages ) =
-            List.foldl addPackageVersion ( packagesRaw, packages ) packagesVersions
-    in
-    Cache
-        { packagesRaw = updatedRaw
-        , packages = updatePackages
-        , dependencies = dependencies
-        }
-
-
-addPackageVersion :
-    ( String, Version )
-    -> ( Array ( String, Version ), Dict String (List Version) )
-    -> ( Array ( String, Version ), Dict String (List Version) )
-addPackageVersion ( package, version ) ( raw, packages ) =
-    case Dict.get package packages of
-        Nothing ->
-            ( Array.push ( package, version ) raw
-            , Dict.insert package [ version ] packages
-            )
-
-        Just versions ->
-            if List.member version versions then
-                ( raw, packages )
-
-            else
-                ( Array.push ( package, version ) raw
-                , Dict.update package (Maybe.map ((::) version)) packages
-                )
+                        |> tryUpdateCached connectivity cache

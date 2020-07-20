@@ -1,10 +1,11 @@
 module Main exposing (main)
 
 import Browser
+import Cache exposing (Cache)
 import Html exposing (Html)
 import Html.Events exposing (onClick)
 import PubGrub
-import Range exposing (Range)
+import Range
 import Version exposing (Version)
 
 
@@ -52,7 +53,7 @@ update msg model =
                         cache
 
                     else
-                        PubGrub.emptyCache
+                        Cache.empty
 
                 ( state, effect ) =
                     PubGrub.init connectivity actualCache "root" Version.one
@@ -69,26 +70,26 @@ update msg model =
                 PubGrub.ListVersions ( package, term ) ->
                     let
                         versions =
-                            simulateListVersions package
+                            Cache.listVersions package cache
 
                         pgMsg =
                             PubGrub.AvailableVersions package term versions
 
                         newStateAndEffect =
-                            PubGrub.update PubGrub.Online PubGrub.emptyCache pgMsg state
+                            PubGrub.update PubGrub.Online Cache.empty pgMsg state
                     in
                     ( Solving newStateAndEffect, Cmd.none )
 
                 PubGrub.RetrieveDependencies ( package, version ) ->
                     let
                         dependencies =
-                            simulateRetrieveDependencies package version
+                            Cache.listDependencies package version cache
 
                         pgMsg =
                             PubGrub.PackageDependencies package version dependencies
 
                         newStateAndEffect =
-                            PubGrub.update PubGrub.Online PubGrub.emptyCache pgMsg state
+                            PubGrub.update PubGrub.Online Cache.empty pgMsg state
                     in
                     ( Solving newStateAndEffect, Cmd.none )
 
@@ -108,55 +109,19 @@ update msg model =
 -- https://github.com/dart-lang/pub/blob/master/doc/solver.md#performing-conflict-resolution
 
 
-cache : PubGrub.Cache
+cache : Cache
 cache =
-    PubGrub.emptyCache
-        |> PubGrub.cachePackageVersions
+    Cache.empty
+        |> Cache.addPackageVersions
             [ ( "root", Version.one )
             , ( "foo", Version.one )
             , ( "foo", Version.two )
             , ( "bar", Version.one )
             ]
-        |> PubGrub.cacheDependencies "root" Version.one [ ( "foo", Range.higherThan Version.one ) ]
-        |> PubGrub.cacheDependencies "foo" Version.two [ ( "bar", Range.between Version.one Version.two ) ]
-        |> PubGrub.cacheDependencies "foo" Version.one []
-        |> PubGrub.cacheDependencies "bar" Version.one [ ( "foo", Range.between Version.one Version.two ) ]
-
-
-simulateListVersions : String -> List Version
-simulateListVersions package =
-    case package of
-        "root" ->
-            [ Version.one ]
-
-        "foo" ->
-            [ Version.one, Version.two ]
-                |> List.reverse
-
-        "bar" ->
-            [ Version.one ]
-
-        _ ->
-            []
-
-
-simulateRetrieveDependencies : String -> Version -> Maybe (List ( String, Range ))
-simulateRetrieveDependencies package version =
-    case ( package, Version.toTuple version ) of
-        ( "root", ( 1, 0, 0 ) ) ->
-            Just [ ( "foo", Range.higherThan Version.one ) ]
-
-        ( "foo", ( 2, 0, 0 ) ) ->
-            Just [ ( "bar", Range.between Version.one Version.two ) ]
-
-        ( "foo", ( 1, 0, 0 ) ) ->
-            Just []
-
-        ( "bar", ( 1, 0, 0 ) ) ->
-            Just [ ( "foo", Range.between Version.one Version.two ) ]
-
-        _ ->
-            Nothing
+        |> Cache.addDependencies "root" Version.one [ ( "foo", Range.higherThan Version.one ) ]
+        |> Cache.addDependencies "foo" Version.two [ ( "bar", Range.between Version.one Version.two ) ]
+        |> Cache.addDependencies "foo" Version.one []
+        |> Cache.addDependencies "bar" Version.one [ ( "foo", Range.between Version.one Version.two ) ]
 
 
 
