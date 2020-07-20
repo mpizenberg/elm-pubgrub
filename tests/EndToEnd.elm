@@ -72,6 +72,19 @@ linearErrorReporting =
                 |> Expect.err
 
 
+priorCauseOldBug5bis : Test
+priorCauseOldBug5bis =
+    Test.test "See PR 5: https://github.com/mpizenberg/elm-pubgrub/pull/5" <|
+        \_ ->
+            PubGrub.solve
+                { listAvailableVersions = Stub.listAvailableVersions5
+                , getDependencies = Stub.getDependencies5
+                }
+                "root"
+                Version.one
+                |> Expect.err
+
+
 branchingErrorReporting : Test
 branchingErrorReporting =
     Test.test "too complex to explain in a linear chain of reasoning" <|
