@@ -6,14 +6,13 @@
     "version": "1.0.0",
     "exposed-modules": [
         "Assignment",
-        "Database.ElmJson",
-        "Database.History",
         "Incompatibility",
         "Memory",
         "PartialSolution",
         "PubGrub",
         "PubGrubCore",
         "Range",
+        "Report",
         "Term",
         "Version"
     ],
