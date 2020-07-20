@@ -30,6 +30,7 @@ listAvailableVersions =
 -- https://github.com/dart-lang/pub/blob/master/doc/solver.md#no-conflicts
 
 
+getDependencies1 : String -> Version -> Maybe (List ( String, Range ))
 getDependencies1 package version =
     case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
@@ -48,6 +49,7 @@ getDependencies1 package version =
             Nothing
 
 
+listAvailableVersions1 : String -> List Version
 listAvailableVersions1 package =
     case package of
         "root" ->
@@ -68,6 +70,7 @@ listAvailableVersions1 package =
 -- https://github.com/dart-lang/pub/blob/master/doc/solver.md#avoiding-conflict-during-decision-making
 
 
+listAvailableVersions2 : String -> List Version
 listAvailableVersions2 package =
     case package of
         "root" ->
@@ -85,6 +88,7 @@ listAvailableVersions2 package =
             []
 
 
+getDependencies2 : String -> Version -> Maybe (List ( String, Range ))
 getDependencies2 package version =
     case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
@@ -117,6 +121,7 @@ getDependencies2 package version =
 -- https://github.com/dart-lang/pub/blob/master/doc/solver.md#performing-conflict-resolution
 
 
+listAvailableVersions3 : String -> List Version
 listAvailableVersions3 package =
     case package of
         "root" ->
@@ -133,6 +138,7 @@ listAvailableVersions3 package =
             []
 
 
+getDependencies3 : String -> Version -> Maybe (List ( String, Range ))
 getDependencies3 package version =
     case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
@@ -156,6 +162,7 @@ getDependencies3 package version =
 -- https://github.com/dart-lang/pub/blob/master/doc/solver.md#conflict-resolution-with-a-partial-satisfier
 
 
+listAvailableVersions4 : String -> List Version
 listAvailableVersions4 package =
     case package of
         "root" ->
@@ -181,6 +188,7 @@ listAvailableVersions4 package =
             []
 
 
+getDependencies4 : String -> Version -> Maybe (List ( String, Range ))
 getDependencies4 package version =
     case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
@@ -225,6 +233,7 @@ getDependencies4 package version =
 -- https://github.com/dart-lang/pub/blob/master/doc/solver.md#linear-error-reporting
 
 
+listAvailableVersions5 : String -> List Version
 listAvailableVersions5 package =
     case package of
         "root" ->
@@ -243,6 +252,7 @@ listAvailableVersions5 package =
             []
 
 
+getDependencies5 : String -> Version -> Maybe (List ( String, Range ))
 getDependencies5 package version =
     case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
@@ -272,6 +282,7 @@ getDependencies5 package version =
 -- https://github.com/dart-lang/pub/blob/master/doc/solver.md#linear-error-reporting
 
 
+listAvailableVersions5bis : String -> List Version
 listAvailableVersions5bis package =
     case package of
         "root" ->
@@ -290,6 +301,7 @@ listAvailableVersions5bis package =
             []
 
 
+getDependencies5bis : String -> Version -> Maybe (List ( String, Range ))
 getDependencies5bis package version =
     case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
@@ -322,6 +334,7 @@ getDependencies5bis package version =
 -- https://github.com/dart-lang/pub/blob/master/doc/solver.md#branching-error-reporting
 
 
+listAvailableVersions6 : String -> List Version
 listAvailableVersions6 package =
     case package of
         "root" ->
@@ -346,6 +359,7 @@ listAvailableVersions6 package =
             []
 
 
+getDependencies6 : String -> Version -> Maybe (List ( String, Range ))
 getDependencies6 package version =
     case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
@@ -389,6 +403,7 @@ getDependencies6 package version =
 -- Example 7: transitive dependency to incompatible root
 
 
+getDependencies7 : String -> Version -> Maybe (List ( String, Range ))
 getDependencies7 package version =
     case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
@@ -413,6 +428,7 @@ getDependencies7 package version =
             Nothing
 
 
+listAvailableVersions7 : String -> List Version
 listAvailableVersions7 package =
     case package of
         "root" ->
