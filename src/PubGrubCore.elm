@@ -113,7 +113,7 @@ pickPackage partial =
 that match the outstanding constraint.
 
 Here we just pick the first one that satisfies the terms.
-Its the responsibility of the provider of `availableVersions`
+It is the responsibility of the provider of `availableVersions`
 to list them with preferred versions first.
 
 -}

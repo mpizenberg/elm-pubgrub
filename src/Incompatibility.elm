@@ -63,16 +63,6 @@ Both a temporally ordered list of terms,
 and an organized dictionary of packages are useful
 at different moments in the PubGrub algorithm.
 
-TODO: Derived incompat with more than one term and has a positive term
-referring to root and containing initial version:
-Pub is normalizing those by removing the root package
-which will always be satisfied.
-
-TODO: Maybe the unknown kind should be extracted into
-an Incompatibility variant NoVersion.
-And the FromDependencyOf and DerivedFrom would be sub variants
-of an IncompatibilityTree variant.
-
 -}
 type Incompatibility
     = Incompatibility { asDict : Dict String Term, asList : List ( String, Term ) } Kind
@@ -269,7 +259,9 @@ they're collapsed together into the single incompatibility {foo ^1.0.0, not bar 
 (provided that no other version of foo exists between 1.0.0 and 2.0.0).
 
 Here we do the simple stupid thing of just growing the list.
-TODO: improve this.
+TODO: improve this. It may not be trivial since those incompatibilities
+may already have derived others.
+Maybe this should not be persued.
 
 -}
 merge : Incompatibility -> List Incompatibility -> List Incompatibility
