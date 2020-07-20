@@ -69,7 +69,6 @@ import Version exposing (Version)
 -}
 type Model
     = Solving String PubGrubCore.Model
-    | Finished (Result String Solution)
 
 
 {-| Solution of the algorithm containing the list of required packages
@@ -132,28 +131,25 @@ updateEffect msg model =
                     applyDecision deps package version pgModel
                         |> solveRec root package
 
-        ( _, Finished _ ) ->
+        ( NoMsg, _ ) ->
             ( model, NoEffect )
-
-        _ ->
-            Debug.todo ("This should not happen, " ++ Debug.toString msg ++ "\n" ++ Debug.toString model)
 
 
 solveRec : String -> String -> PubGrubCore.Model -> ( Model, Effect )
 solveRec root package pgModel =
     case PubGrubCore.unitPropagation root package pgModel of
         Err msg ->
-            ( Finished (Err msg), SignalEnd (Err msg) )
+            ( Solving package pgModel, SignalEnd (Err msg) )
 
         Ok updatedModel ->
             case PubGrubCore.pickPackage updatedModel.partialSolution of
                 Nothing ->
                     case PartialSolution.solution updatedModel.partialSolution of
                         Just solution ->
-                            ( Finished (Ok solution), SignalEnd (Ok solution) )
+                            ( Solving package updatedModel, SignalEnd (Ok solution) )
 
                         Nothing ->
-                            ( Finished (Err "How did we end up with no package to choose but no solution?")
+                            ( Solving package updatedModel
                             , SignalEnd (Err "How did we end up with no package to choose but no solution?")
                             )
 
@@ -207,12 +203,12 @@ solve config root version =
 
 updateUntilFinished : PackagesConfig -> ( Model, Effect ) -> Result String Solution
 updateUntilFinished config ( model, effect ) =
-    case model of
-        Solving _ _ ->
-            updateUntilFinished config (updateEffect (performSync config effect) model)
+    case effect of
+        SignalEnd result ->
+            result
 
-        Finished finished ->
-            finished
+        _ ->
+            updateUntilFinished config (updateEffect (performSync config effect) model)
 
 
 performSync : PackagesConfig -> Effect -> Msg
@@ -276,7 +272,7 @@ tryUpdateCached connectivity (Cache cache) modelAndEffect =
         ( _, NoEffect ) ->
             modelAndEffect
 
-        ( Finished _, _ ) ->
+        ( _, SignalEnd _ ) ->
             modelAndEffect
 
         ( model, ListVersions ( package, term ) ) ->
@@ -308,15 +304,12 @@ tryUpdateCached connectivity (Cache cache) modelAndEffect =
                                 err =
                                     "Dependencies of " ++ package ++ " " ++ Version.toDebugString version ++ " missing."
                             in
-                            ( Finished (Err err), SignalEnd (Err err) )
+                            ( Solving package pgModel, SignalEnd (Err err) )
 
                 Just deps ->
                     applyDecision deps package version pgModel
                         |> solveRec root package
                         |> tryUpdateCached connectivity (Cache cache)
-
-        _ ->
-            Debug.todo "This should not happen?"
 
 
 
