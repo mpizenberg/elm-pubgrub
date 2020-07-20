@@ -5,6 +5,28 @@ version solving algorithm in the Elm programming language.
 
 It consists in efficiently finding a set of packages and versions
 that satisfy all the constraints of a given project dependencies.
+In addition, when that is not possible,
+PubGrub tries to provide a very human-readable and clear
+explaination as to why that failed.
+Below is an example of explanation present in
+the introductory blog post about PubGrub
+(elm-pubgrub is almost there ^^).
+
+```txt
+Because dropdown >=2.0.0 depends on icons >=2.0.0 and root depends
+  on icons <2.0.0, dropdown >=2.0.0 is forbidden.
+
+And because menu >=1.1.0 depends on dropdown >=2.0.0, menu >=1.1.0
+  is forbidden.
+
+And because menu <1.1.0 depends on dropdown >=1.0.0 <2.0.0 which
+  depends on intl <4.0.0, every version of menu requires intl
+  <4.0.0.
+
+So, because root depends on both menu >=1.0.0 and intl >=5.0.0,
+  version solving failed.
+```
+
 The algorithm is generic and works for any type of dependency system
 with the following caracteristics, not only Elm packages.
 
