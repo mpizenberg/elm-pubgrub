@@ -23,7 +23,7 @@ import Term exposing (Term)
 import Version exposing (Version)
 
 
-{-| An assignment refers to a given package (`name : String`) and can either be
+{-| An assignment refers to a given package and can either be
 (1) a decision, which is a chosen version,
 or (2) a derivation, which is a `Term` specifying compatible versions.
 
@@ -32,7 +32,7 @@ including this one if it is a decision.
 
 -}
 type alias Assignment =
-    { name : String
+    { package : String
     , decisionLevel : Int
     , kind : Kind
     }
@@ -56,12 +56,12 @@ type Kind
 {-| Encode an assignment into a JavaScript Value.
 -}
 encodeDebug : Assignment -> Value
-encodeDebug { name, decisionLevel, kind } =
+encodeDebug { package, decisionLevel, kind } =
     case kind of
         Decision version ->
             Json.Encode.object
                 [ ( "kind", Json.Encode.string "Decision" )
-                , ( "name", Json.Encode.string name )
+                , ( "package", Json.Encode.string package )
                 , ( "decisionLevel", Json.Encode.int decisionLevel )
                 , ( "version", Json.Encode.string (Version.toDebugString version) )
                 ]
@@ -69,7 +69,7 @@ encodeDebug { name, decisionLevel, kind } =
         Derivation term { cause } ->
             Json.Encode.object
                 [ ( "kind", Json.Encode.string "Derivation" )
-                , ( "name", Json.Encode.string name )
+                , ( "package", Json.Encode.string package )
                 , ( "decisionLevel", Json.Encode.int decisionLevel )
                 , ( "term", Json.Encode.string (Term.toDebugString term) )
                 , ( "cause", Json.Encode.string (Incompatibility.toDebugString 1 0 cause) )
@@ -97,8 +97,8 @@ getTerm kind =
 {-| Constructor for a decision.
 -}
 newDecision : String -> Version -> Int -> Assignment
-newDecision name version decisionLevel =
-    { name = name
+newDecision package version decisionLevel =
+    { package = package
     , decisionLevel = decisionLevel
     , kind = Decision version
     }
@@ -107,8 +107,8 @@ newDecision name version decisionLevel =
 {-| Constructor for a derivation.
 -}
 newDerivation : String -> Term -> Int -> Incompatibility -> Assignment
-newDerivation name term decisionLevel cause =
-    { name = name
+newDerivation package term decisionLevel cause =
+    { package = package
     , decisionLevel = decisionLevel
     , kind = Derivation term { cause = cause }
     }

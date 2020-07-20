@@ -1,374 +1,498 @@
-module PubGrub exposing (solve)
+module PubGrub exposing
+    ( Solution
+    , PackagesConfig, solve
+    , State, stateToString, Effect(..), effectToString, Msg(..)
+    , Connectivity(..), init, update
+    , Cache, emptyCache, cacheDependencies, cachePackageVersions
+    )
 
 {-| PubGrub version solving algorithm.
 
-PubGrub is a version solving algorithm,
-written in 2018 by Natalie Weizenbaum
-for the Dart package manager.
-It is supposed to be very fast and to explain errors
-more clearly than the alternatives.
-An introductory blog post was
-[published on Medium][medium-pubgrub] by its author.
+It consists in efficiently finding a set of packages and versions
+that satisfy all the constraints of a given project dependencies.
+In addition, when that is not possible,
+PubGrub tries to provide a very human-readable and clear
+explaination as to why that failed.
+Below is an example of explanation present in
+the introductory blog post about PubGrub
+(elm-pubgrub is almost there ^^).
 
-The detailed explanation of the algorithm is
-[provided on GitHub][github-pubgrub].
-The foundation of the algorithm is based on ASP (Answer Set Programming)
-and a book called
-"[Answer Set Solving in Practice][potassco-book]"
-by Martin Gebser, Roland Kaminski, Benjamin Kaufmann and Torsten Schaub.
+```txt
+Because dropdown >=2.0.0 depends on icons >=2.0.0 and
+  root depends on icons <2.0.0, dropdown >=2.0.0 is forbidden.
 
-[medium-pubgrub]: https://medium.com/@nex3/pubgrub-2fb6470504f
-[github-pubgrub]: https://github.com/dart-lang/pub/blob/master/doc/solver.md
-[potassco-book]: https://potassco.org/book/
+And because menu >=1.1.0 depends on dropdown >=2.0.0,
+  menu >=1.1.0 is forbidden.
 
-@docs solve
+And because menu <1.1.0 depends on dropdown >=1.0.0 <2.0.0
+  which depends on intl <4.0.0, every version of menu
+  requires intl <4.0.0.
+
+So, because root depends on both menu >=1.0.0 and intl >=5.0.0,
+  version solving failed.
+```
+
+The algorithm is generic and works for any type of dependency system
+with the following caracteristics, not only Elm packages.
+
+  - Versions use the semantic versioning scheme (Major.Minor.Patch).
+  - Packages cannot be simultaneously present at two different versions.
+  - Dependencies are expressed in one of the following forms
+      - exact version (`foo 1.0.0 depends bar 1.0.0`)
+      - higher or equal version (`foo 1.0.0 depends on bar >= 1.0.0`)
+      - stricly lower version (`foo 1.0.0 depends on bar < 2.0.0`)
+      - ranges of versions (`foo 1.0.0 depends on bar 1.0.0 <= v < 2.0.0`)
+
+PS: at publication, only the `PubGrub`, `Version`, `Range`, and `Term`
+modules will be exposed.
+Others are exposed for easy docs usage at the moment.
+
+
+## API
+
+The algorithm is provided in two forms, synchronous and asynchronous.
+The synchronous API is quite straightforward.
+The async one uses the `Effect` pattern to be easily integrated
+into the TEA architecture.
+
+
+### Direct sync call
+
+    PubGrub.solve config package version
+
+Where config provides the list of available packages and versions,
+as well as the dependencies of every available package.
+The call to `PubGrub.solve` for a given package at a given version
+will compute the set of packages and versions needed.
+
+
+### Async API
+
+Sometimes, it is too expensive to provide upfront
+the list of all packages and versions,
+as well as all dependencies for every one of those.
+This may very well require some network or other async requests.
+For this reason, it is possible to run the PubGrub algorithm step by step.
+Every time an effect may be required, it stops and informs the caller,
+which may resume the algorithm once necessary data is loaded.
+
+    PubGrub.update : Connectivity -> Cache -> Msg -> State -> ( State, Effect )
+
+The `Effect` type is public to enable the caller to perform
+the required task before resuming.
+The `Msg` type is also public to drive the algorithm according
+to what was expected in the last effect when resuming.
+
+At any point between two `update` calls,
+the caller can change the `Connectivity`
+and update the `Cache` of already loaded data.
+
+The algorithm informs the caller that all is done
+when the `SignalEnd result` effect is emitted.
+
+
+# Common to sync and async
+
+@docs Solution
+
+
+# Sync
+
+@docs PackagesConfig, solve
+
+
+# Async
+
+@docs State, stateToString, Effect, effectToString, Msg
+@docs Connectivity, init, update
+@docs Cache, emptyCache, cacheDependencies, cachePackageVersions
 
 -}
 
-import Assignment
-import Database.Stub as Stub
-import Dict
-import Incompatibility exposing (Incompatibility)
-import PartialSolution exposing (PartialSolution)
+import Array exposing (Array)
+import Dict exposing (Dict)
+import Incompatibility
+import PartialSolution
+import PubGrubCore
 import Range exposing (Range)
 import Term exposing (Term)
 import Version exposing (Version)
 
 
-type alias Model =
-    { incompatibilities : List Incompatibility
-    , partialSolution : PartialSolution
-    }
+
+-- Common parts for both sync and async
 
 
-init : String -> Version -> Model
-init root version =
-    { incompatibilities = [ Incompatibility.fromTerm root (Term.Negative (Range.exact version)) ]
-    , partialSolution = PartialSolution.empty
-    }
+{-| Internal state of the PubGrub algorithm.
+-}
+type State
+    = State { root : String, pgModel : PubGrubCore.Model }
 
 
-setIncompatibilities : List Incompatibility -> Model -> Model
-setIncompatibilities incompatibilities model =
-    { incompatibilities = incompatibilities
-    , partialSolution = model.partialSolution
-    }
+
+-- { incompatibilities : List Incompatibility
+-- , partialSolution : PartialSolution
 
 
-setPartialSolution : PartialSolution -> Model -> Model
-setPartialSolution partialSolution model =
-    { incompatibilities = model.incompatibilities
-    , partialSolution = partialSolution
-    }
+{-| Convert a state into a printable string (for human reading).
+-}
+stateToString : State -> String
+stateToString (State { pgModel }) =
+    let
+        partialSolution =
+            PartialSolution.toDebugString pgModel.partialSolution
+
+        incompatibilities =
+            pgModel.incompatibilities
+                |> List.map (Incompatibility.toDebugString 1 0)
+                |> String.join "\n"
+    in
+    "Partial solution at this stage:\n\n"
+        ++ partialSolution
+        ++ "\n\nSet of incompatibilities:\n\n"
+        ++ incompatibilities
 
 
-updateIncompatibilities : (List Incompatibility -> List Incompatibility) -> Model -> Model
-updateIncompatibilities f { incompatibilities, partialSolution } =
-    { incompatibilities = f incompatibilities
-    , partialSolution = partialSolution
-    }
+{-| Solution of the algorithm containing the list of required packages
+with their version number.
+-}
+type alias Solution =
+    List ( String, Version )
 
 
-updatePartialSolution : (PartialSolution -> PartialSolution) -> Model -> Model
-updatePartialSolution f { incompatibilities, partialSolution } =
-    { incompatibilities = incompatibilities
-    , partialSolution = f partialSolution
+{-| Messages used to progress in the algorithm.
+
+You should pick the one you need depending on the last effect emitted.
+For example, the `ListVersions` effect is asking you to retrieve
+available versions for a given package.
+Once done, inform PubGrub with the `AvailableVersions` message
+(and pass around the `Term` value).
+
+-}
+type Msg
+    = NoMsg
+    | AvailableVersions String Term (List Version)
+    | PackageDependencies String Version (Maybe (List ( String, Range )))
+
+
+{-| Those are the effects required by the PubGrub algorithm.
+Once emitted, they may require you to retrieve some data,
+and then send the adequate message to the algorithm.
+-}
+type Effect
+    = NoEffect
+    | ListVersions ( String, Term )
+    | RetrieveDependencies ( String, Version )
+    | SignalEnd (Result String Solution)
+
+
+{-| Convert an effect into a printable string (for human reading).
+-}
+effectToString : Effect -> String
+effectToString effect =
+    case effect of
+        NoEffect ->
+            "No effect"
+
+        ListVersions ( package, _ ) ->
+            "List existing versions of package " ++ package
+
+        RetrieveDependencies ( package, version ) ->
+            "Retrieve the list of dependencies of package "
+                ++ package
+                ++ " at version "
+                ++ Version.toDebugString version
+
+        SignalEnd result ->
+            case result of
+                Ok _ ->
+                    "Solving terminated succesfully"
+
+                Err _ ->
+                    "Solving terminated with an error"
+
+
+updateEffect : Msg -> State -> ( State, Effect )
+updateEffect msg ((State { root, pgModel }) as state) =
+    case msg of
+        AvailableVersions package term versions ->
+            case PubGrubCore.pickVersion versions term of
+                Just version ->
+                    ( state, RetrieveDependencies ( package, version ) )
+
+                Nothing ->
+                    let
+                        noVersionIncompat =
+                            Incompatibility.noVersion package term
+
+                        updatedModel =
+                            PubGrubCore.mapIncompatibilities (Incompatibility.merge noVersionIncompat) pgModel
+                    in
+                    solveRec root package updatedModel
+
+        PackageDependencies package version maybeDependencies ->
+            case maybeDependencies of
+                Nothing ->
+                    let
+                        unavailableDepsIncompat =
+                            Incompatibility.unavailableDeps package version
+
+                        updatedModel =
+                            PubGrubCore.mapIncompatibilities (Incompatibility.merge unavailableDepsIncompat) pgModel
+                    in
+                    solveRec root package updatedModel
+
+                Just deps ->
+                    applyDecision deps package version pgModel
+                        |> solveRec root package
+
+        NoMsg ->
+            ( state, NoEffect )
+
+
+solveRec : String -> String -> PubGrubCore.Model -> ( State, Effect )
+solveRec root package pgModel =
+    case PubGrubCore.unitPropagation root package pgModel of
+        Err msg ->
+            ( State { root = root, pgModel = pgModel }, SignalEnd (Err msg) )
+
+        Ok updatedModel ->
+            case PubGrubCore.pickPackage updatedModel.partialSolution of
+                Nothing ->
+                    case PartialSolution.solution updatedModel.partialSolution of
+                        Just solution ->
+                            ( State { root = root, pgModel = updatedModel }, SignalEnd (Ok solution) )
+
+                        Nothing ->
+                            ( State { root = root, pgModel = updatedModel }
+                            , SignalEnd (Err "How did we end up with no package to choose but no solution?")
+                            )
+
+                Just packageAndTerm ->
+                    ( State { root = root, pgModel = updatedModel }, ListVersions packageAndTerm )
+
+
+applyDecision : List ( String, Range ) -> String -> Version -> PubGrubCore.Model -> PubGrubCore.Model
+applyDecision dependencies package version pgModel =
+    let
+        depIncompats =
+            Incompatibility.fromDependencies package version dependencies
+
+        _ =
+            Debug.log ("Add the following " ++ String.fromInt (List.length depIncompats) ++ " incompatibilities from dependencies of " ++ package) ""
+
+        _ =
+            depIncompats
+                |> List.map (\i -> Debug.log (Incompatibility.toDebugString 1 3 i) "")
+
+        updatedIncompatibilities =
+            List.foldr Incompatibility.merge pgModel.incompatibilities depIncompats
+    in
+    case PartialSolution.addVersion package version depIncompats pgModel.partialSolution of
+        Nothing ->
+            PubGrubCore.setIncompatibilities updatedIncompatibilities pgModel
+
+        Just updatedPartial ->
+            PubGrubCore.Model updatedIncompatibilities updatedPartial
+
+
+
+-- SYNC ##############################################################
+
+
+{-| Configuration of available packages to solve dependencies.
+-}
+type alias PackagesConfig =
+    { listAvailableVersions : String -> List Version
+    , getDependencies : String -> Version -> Maybe (List ( String, Range ))
     }
 
 
 {-| PubGrub version solving algorithm.
 -}
-solve : String -> Version -> Result String (List ( String, Version ))
-solve root version =
-    solveRec root root (init root version)
+solve : PackagesConfig -> String -> Version -> Result String Solution
+solve config root version =
+    solveRec root root (PubGrubCore.init root version)
+        |> updateUntilFinished config
 
 
-solveRec : String -> String -> Model -> Result String (List ( String, Version ))
-solveRec root package model =
-    case unitPropagation root package model of
-        Err msg ->
-            Err msg
+updateUntilFinished : PackagesConfig -> ( State, Effect ) -> Result String Solution
+updateUntilFinished config ( state, effect ) =
+    case effect of
+        SignalEnd result ->
+            result
 
-        Ok updatedModel ->
-            case makeDecision Stub.listAvailableVersions updatedModel of
+        _ ->
+            updateUntilFinished config (updateEffect (performSync config effect) state)
+
+
+performSync : PackagesConfig -> Effect -> Msg
+performSync config effect =
+    case effect of
+        NoEffect ->
+            NoMsg
+
+        ListVersions ( package, term ) ->
+            AvailableVersions package term (config.listAvailableVersions package)
+
+        RetrieveDependencies ( package, version ) ->
+            config.getDependencies package version
+                |> PackageDependencies package version
+
+        SignalEnd _ ->
+            -- ? not sure
+            NoMsg
+
+
+
+-- ASYNC #############################################################
+
+
+{-| Online or Offline.
+
+In Offline mode, the `ListVersions` effect is never emitted
+because we never know if a new version or not may be available,
+and thus if the cache contains or not all available versions.
+It will always use the list of versions available in cache.
+
+In Offline mode, the `RetrieveDependencies` effect is never emitted.
+Either the dependencies are known and it will continue,
+or they aren't and it will signal a failure.
+
+-}
+type Connectivity
+    = Online
+    | Offline
+
+
+{-| Initialize PubGrub algorithm.
+-}
+init : Connectivity -> Cache -> String -> Version -> ( State, Effect )
+init connectivity cache root version =
+    solveRec root root (PubGrubCore.init root version)
+        |> tryUpdateCached connectivity cache
+
+
+{-| Update the state of the PubGrub algorithm.
+-}
+update : Connectivity -> Cache -> Msg -> State -> ( State, Effect )
+update connectivity cache msg state =
+    updateEffect msg state
+        |> tryUpdateCached connectivity cache
+
+
+tryUpdateCached : Connectivity -> Cache -> ( State, Effect ) -> ( State, Effect )
+tryUpdateCached connectivity (Cache cache) stateAndEffect =
+    case stateAndEffect of
+        ( _, NoEffect ) ->
+            stateAndEffect
+
+        ( _, SignalEnd _ ) ->
+            stateAndEffect
+
+        ( state, ListVersions ( package, term ) ) ->
+            case connectivity of
+                Online ->
+                    stateAndEffect
+
+                Offline ->
+                    let
+                        versions =
+                            Dict.get package cache.packages
+                                |> Maybe.withDefault []
+
+                        msg =
+                            AvailableVersions package term versions
+                    in
+                    update connectivity (Cache cache) msg state
+
+        ( (State { root, pgModel }) as state, RetrieveDependencies ( package, version ) ) ->
+            case Dict.get ( package, Version.toTuple version ) cache.dependencies of
                 Nothing ->
-                    PartialSolution.solution updatedModel.partialSolution
-                        |> Result.fromMaybe "Is this possible???"
+                    case connectivity of
+                        Online ->
+                            stateAndEffect
 
-                Just ( next, updatedAgainModel ) ->
-                    solveRec root next updatedAgainModel
+                        Offline ->
+                            let
+                                msg =
+                                    PackageDependencies package version Nothing
+                            in
+                            update connectivity (Cache cache) msg state
 
-
-makeDecision : (String -> List Version) -> Model -> Maybe ( String, Model )
-makeDecision listAvailableVersions model =
-    case pickPackageVersion model.partialSolution listAvailableVersions of
-        Nothing ->
-            Nothing
-
-        Just (Err ( name, incompat )) ->
-            Just ( name, updateIncompatibilities (Incompatibility.merge incompat) model )
-
-        Just (Ok ( name, version )) ->
-            let
-                dependencies =
-                    case Stub.getDependencies name version of
-                        Just deps ->
-                            deps
-
-                        Nothing ->
-                            Debug.todo "The name and version should exist"
-
-                depIncompats =
-                    Incompatibility.fromDependencies name version dependencies
-
-                _ =
-                    Debug.log ("Add the following " ++ String.fromInt (List.length depIncompats) ++ " incompatibilities from dependencies of " ++ name) ""
-
-                _ =
-                    depIncompats
-                        |> List.map (\i -> Debug.log (Incompatibility.toDebugString 1 3 i) "")
-
-                updatedIncompatibilities =
-                    List.foldr Incompatibility.merge model.incompatibilities depIncompats
-            in
-            case PartialSolution.addVersion name version depIncompats model.partialSolution of
-                Nothing ->
-                    Just ( name, setIncompatibilities updatedIncompatibilities model )
-
-                Just updatedPartial ->
-                    Just ( name, Model updatedIncompatibilities updatedPartial )
+                Just deps ->
+                    applyDecision deps package version pgModel
+                        |> solveRec root package
+                        |> tryUpdateCached connectivity (Cache cache)
 
 
-{-| Heuristic to pick the next package & version to add to the partial solution.
-This should be a package with a positive derivation but no decision yet.
-If multiple choices are possible, use a heuristic.
 
-Pub chooses the latest matching version of the package
-with the fewest versions that match the outstanding constraint.
-This tends to find conflicts earlier if any exist,
-since these packages will run out of versions to try more quickly.
-But there's likely room for improvement in these heuristics.
+-- Cache
 
-Let "term" be the intersection of all assignment in the partial solution
-referring to that package.
-If no version matches that term return an error with
-the package name and the incompatibity {term}.
 
+{-| Cache holding already loaded packages information.
 -}
-pickPackageVersion : PartialSolution -> (String -> List Version) -> Maybe (Result ( String, Incompatibility ) ( String, Version ))
-pickPackageVersion partial listAvailableVersions =
-    case pickPackage partial of
-        Just ( name, term ) ->
-            pickVersion (listAvailableVersions name) term
-                |> Maybe.map (Tuple.pair name)
-                |> Result.fromMaybe ( name, Incompatibility.fromTerm name term )
-                |> Just
-
-        Nothing ->
-            Nothing
+type Cache
+    = Cache
+        { packagesRaw : Array ( String, Version )
+        , packages : Dict String (List Version)
+        , dependencies : Dict ( String, ( Int, Int, Int ) ) (List ( String, Range ))
+        }
 
 
-{-| Heuristic to pick the next package to add to the partial solution.
-This should be a package with a positive derivation but no decision yet.
-If multiple choices are possible, use a heuristic.
-
-Pub chooses the package with the fewest versions
-matching the outstanding constraint.
-This tends to find conflicts earlier if any exist,
-since these packages will run out of versions to try more quickly.
-But there's likely room for improvement in these heuristics.
-
-Here we just pick the first one.
-
+{-| Initial empty cache.
 -}
-pickPackage : PartialSolution -> Maybe ( String, Term )
-pickPackage partial =
-    PartialSolution.potentialPackages partial
-        |> Dict.toList
-        |> List.head
-        |> Maybe.map (Tuple.mapSecond (Term.listIntersection Nothing))
+emptyCache : Cache
+emptyCache =
+    Cache
+        { packagesRaw = Array.empty
+        , packages = Dict.empty
+        , dependencies = Dict.empty
+        }
 
 
-{-| Pub chooses the latest matching version of the package
-that match the outstanding constraint.
-
-Here we just pick the first one that satisfies the terms.
-Its the responsibility of the provider of `availableVersions`
-to list them with preferred versions first.
-
+{-| Add dependencies of a package to the cache.
 -}
-pickVersion : List Version -> Term -> Maybe Version
-pickVersion availableVersions partialSolutionTerm =
-    case availableVersions of
-        [] ->
-            Nothing
-
-        v :: others ->
-            if Term.acceptVersionJust v partialSolutionTerm then
-                Just v
-
-            else
-                pickVersion others partialSolutionTerm
-
-
-getDependencies : String -> Version -> Maybe (List ( String, Range ))
-getDependencies package version =
-    Debug.todo "Should be implemented lazily"
-
-
-unitPropagation : String -> String -> Model -> Result String Model
-unitPropagation root package model =
-    unitPropagationLoop root "" [ package ] [] model
-
-
-unitPropagationLoop : String -> String -> List String -> List Incompatibility -> Model -> Result String Model
-unitPropagationLoop root package changed loopIncompatibilities model =
-    case loopIncompatibilities of
-        [] ->
-            case changed of
-                [] ->
-                    Ok model
-
-                pack :: othersChanged ->
-                    unitPropagationLoop root pack othersChanged model.incompatibilities model
-
-        incompat :: othersIncompat ->
-            if Dict.member package (Incompatibility.asDict incompat) then
-                case PartialSolution.relation incompat model.partialSolution of
-                    Incompatibility.Satisfies ->
-                        case conflictResolution False root incompat model of
-                            Err msg ->
-                                Err msg
-
-                            Ok ( priorCause, updatedModel ) ->
-                                -- priorCause is guaranted to be almost satisfied by the partial solution
-                                case PartialSolution.relation priorCause updatedModel.partialSolution of
-                                    Incompatibility.AlmostSatisfies name term ->
-                                        let
-                                            -- add (not term) to partial solution with incompat as cause
-                                            updatedAgainModel =
-                                                updatePartialSolution (PartialSolution.prependDerivation name (Term.negate term) priorCause) updatedModel
-                                        in
-                                        -- Replace changed with a set containing only term's package name.
-                                        -- Would love to use the |> syntax if it would not break tail call optimization (TCO).
-                                        unitPropagationLoop root package [ name ] othersIncompat updatedAgainModel
-
-                                    _ ->
-                                        Err "This should never happen, priorCause is guaranted to be almost satisfied by the partial solution"
-
-                    Incompatibility.AlmostSatisfies name term ->
-                        let
-                            updatedModel =
-                                -- derivation :: partial
-                                updatePartialSolution (PartialSolution.prependDerivation name (Term.negate term) incompat) model
-                        in
-                        -- Would love to use the |> syntax if it didn't break TCO.
-                        unitPropagationLoop root package (name :: changed) othersIncompat updatedModel
-
-                    _ ->
-                        unitPropagationLoop root package changed othersIncompat model
-
-            else
-                unitPropagationLoop root package changed othersIncompat model
-
-
-{-| Return prior cause and the updated model.
--}
-conflictResolution : Bool -> String -> Incompatibility -> Model -> Result String ( Incompatibility, Model )
-conflictResolution incompatChanged root incompat model =
-    if Dict.isEmpty (Incompatibility.asDict incompat) || Incompatibility.singlePositive root incompat then
-        let
-            _ =
-                Debug.log ("Final incompatibility:\n" ++ Incompatibility.toDebugString -1 3 incompat) ""
-
-            _ =
-                Debug.log "Model incompatibilities:" ""
-
-            _ =
-                List.map (\i -> Debug.log (Incompatibility.toDebugString 1 3 i) "") model.incompatibilities
-
-            _ =
-                Debug.log ("Model partial solution:" ++ PartialSolution.toDebugString model.partialSolution) ""
-        in
-        Err reportError
+cacheDependencies : String -> Version -> List ( String, Range ) -> Cache -> Cache
+cacheDependencies package version deps (Cache cache) =
+    if Dict.member ( package, Version.toTuple version ) cache.dependencies then
+        Cache cache
 
     else
-        -- TODO: tail rec
-        continueResolution incompatChanged root incompat model
+        Cache { cache | dependencies = Dict.insert ( package, Version.toTuple version ) deps cache.dependencies }
 
 
-reportError : String
-reportError =
-    "The root package can't be selected, version solving has failed"
-
-
-continueResolution : Bool -> String -> Incompatibility -> Model -> Result String ( Incompatibility, Model )
-continueResolution incompatChanged root incompat model =
+{-| Add a list of packages and versions to the cache.
+-}
+cachePackageVersions : List ( String, Version ) -> Cache -> Cache
+cachePackageVersions packagesVersions (Cache { packagesRaw, packages, dependencies }) =
     let
-        ( satisfier, earlierPartial, term ) =
-            PartialSolution.findSatisfier incompat model.partialSolution
-
-        maybePreviousSatisfier =
-            PartialSolution.findPreviousSatisfier satisfier incompat earlierPartial
-
-        previousSatisfierLevel =
-            Maybe.map (\( a, _, _ ) -> a.decisionLevel) maybePreviousSatisfier
-                -- TODO: According to PubGrub doc, decision level 1 is the decision level
-                -- where root package was selected,
-                -- however I see in the examples that the root level corresponds to decision level 0 ...
-                -- To be clarified.
-                |> Maybe.withDefault 1
+        ( updatedRaw, updatePackages ) =
+            List.foldl addPackageVersion ( packagesRaw, packages ) packagesVersions
     in
-    case satisfier.kind of
-        -- if satisfier.kind == Assignment.Decision || previousSatisfierLevel /= satisfier.decisionLevel then
-        Assignment.Decision _ ->
-            Ok ( incompat, backtrack incompatChanged previousSatisfierLevel incompat model )
+    Cache
+        { packagesRaw = updatedRaw
+        , packages = updatePackages
+        , dependencies = dependencies
+        }
 
-        Assignment.Derivation satisfierTerm { cause } ->
-            if previousSatisfierLevel /= satisfier.decisionLevel then
-                Ok ( incompat, backtrack incompatChanged previousSatisfierLevel incompat model )
+
+addPackageVersion :
+    ( String, Version )
+    -> ( Array ( String, Version ), Dict String (List Version) )
+    -> ( Array ( String, Version ), Dict String (List Version) )
+addPackageVersion ( package, version ) ( raw, packages ) =
+    case Dict.get package packages of
+        Nothing ->
+            ( Array.push ( package, version ) raw
+            , Dict.insert package [ version ] packages
+            )
+
+        Just versions ->
+            if List.member version versions then
+                ( raw, packages )
 
             else
-                let
-                    priorCause =
-                        -- "priorCause is guaranted to be almost satisfied by the partial solution"
-                        Incompatibility.priorCause satisfier.name cause incompat
-                in
-                -- if satisfier does not satisfy term
-                if not (Term.satisfies term [ satisfierTerm ]) then
-                    -- add `not (satisfier \ term)` to priorCause. Then set incompat to priorCause
-                    -- satisfier \ term  ===  intersection satisfier (not term)
-                    -- not (...)  ===  union (not satisfier) (term)
-                    let
-                        derived =
-                            Term.union term (Term.negate satisfierTerm)
-
-                        newIncompat =
-                            -- priorCause is guaranted to not contain satisfier.name
-                            -- so we can safely insert the derived term.
-                            Incompatibility.insert satisfier.name derived priorCause
-                    in
-                    -- set incompat to newIncompat
-                    -- TODO: tail rec
-                    conflictResolution True root newIncompat model
-
-                else
-                    -- set incompat to priorCause
-                    -- TODO: tail rec
-                    conflictResolution True root priorCause model
-
-
-backtrack : Bool -> Int -> Incompatibility -> Model -> Model
-backtrack incompatChanged previousSatisfierLevel incompat model =
-    { partialSolution = PartialSolution.dropUntilLevel previousSatisfierLevel model.partialSolution
-    , incompatibilities =
-        if incompatChanged then
-            let
-                _ =
-                    Debug.log ("Add root cause incompatibility:\n" ++ Incompatibility.toDebugString -1 3 incompat) ""
-            in
-            incompat :: model.incompatibilities
-
-        else
-            model.incompatibilities
-    }
+                ( Array.push ( package, version ) raw
+                , Dict.update package (Maybe.map ((::) version)) packages
+                )

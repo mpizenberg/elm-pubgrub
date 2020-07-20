@@ -1,9 +1,25 @@
-module Database.Stub exposing (getDependencies, listAvailableVersions)
+module Database.Stub exposing
+    ( getDependencies1, listAvailableVersions1
+    , getDependencies2, listAvailableVersions2
+    , getDependencies3, listAvailableVersions3
+    , getDependencies4, listAvailableVersions4
+    , getDependencies5, listAvailableVersions5
+    , getDependencies5bis, listAvailableVersions5bis
+    , getDependencies6, listAvailableVersions6
+    , getDependencies7, listAvailableVersions7
+    )
 
 {-| Examples dependencies for algorithm debugging purposes.
 Those should eventually be moved into unit tests.
 
-@docs getDependencies, listAvailableVersions
+@docs getDependencies1, listAvailableVersions1
+@docs getDependencies2, listAvailableVersions2
+@docs getDependencies3, listAvailableVersions3
+@docs getDependencies4, listAvailableVersions4
+@docs getDependencies5, listAvailableVersions5
+@docs getDependencies5bis, listAvailableVersions5bis
+@docs getDependencies6, listAvailableVersions6
+@docs getDependencies7, listAvailableVersions7
 
 -}
 
@@ -11,25 +27,29 @@ import Range exposing (Range)
 import Version exposing (Version)
 
 
-{-| Get the list of dependencies of a given package at a given version.
+{-| Example 1: no conflict
+
+<https://github.com/dart-lang/pub/blob/master/doc/solver.md#no-conflicts>
+
 -}
-getDependencies : String -> Version -> Maybe (List ( String, Range ))
-getDependencies =
-    getDependencies1
+listAvailableVersions1 : String -> List Version
+listAvailableVersions1 package =
+    case package of
+        "root" ->
+            [ Version.one ]
+
+        "foo" ->
+            [ Version.one ]
+
+        "bar" ->
+            [ Version.one, Version.two ]
+
+        _ ->
+            []
 
 
-{-| Get the list of available versions for a given package.
--}
-listAvailableVersions : String -> List Version
-listAvailableVersions =
-    listAvailableVersions1
-
-
-
--- Example 1: no conflict
--- https://github.com/dart-lang/pub/blob/master/doc/solver.md#no-conflicts
-
-
+{-| -}
+getDependencies1 : String -> Version -> Maybe (List ( String, Range ))
 getDependencies1 package version =
     case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
@@ -48,26 +68,12 @@ getDependencies1 package version =
             Nothing
 
 
-listAvailableVersions1 package =
-    case package of
-        "root" ->
-            [ Version.one ]
+{-| Example 2: avoiding conflict during decision making
 
-        "foo" ->
-            [ Version.one ]
+<https://github.com/dart-lang/pub/blob/master/doc/solver.md#avoiding-conflict-during-decision-making>
 
-        "bar" ->
-            [ Version.one, Version.two ]
-
-        _ ->
-            []
-
-
-
--- Example 2: avoiding conflict during decision making
--- https://github.com/dart-lang/pub/blob/master/doc/solver.md#avoiding-conflict-during-decision-making
-
-
+-}
+listAvailableVersions2 : String -> List Version
 listAvailableVersions2 package =
     case package of
         "root" ->
@@ -85,6 +91,8 @@ listAvailableVersions2 package =
             []
 
 
+{-| -}
+getDependencies2 : String -> Version -> Maybe (List ( String, Range ))
 getDependencies2 package version =
     case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
@@ -112,11 +120,12 @@ getDependencies2 package version =
             Nothing
 
 
+{-| Example 3: performing conflict resolution
 
--- Example 3: performing conflict resolution
--- https://github.com/dart-lang/pub/blob/master/doc/solver.md#performing-conflict-resolution
+<https://github.com/dart-lang/pub/blob/master/doc/solver.md#performing-conflict-resolution>
 
-
+-}
+listAvailableVersions3 : String -> List Version
 listAvailableVersions3 package =
     case package of
         "root" ->
@@ -133,6 +142,8 @@ listAvailableVersions3 package =
             []
 
 
+{-| -}
+getDependencies3 : String -> Version -> Maybe (List ( String, Range ))
 getDependencies3 package version =
     case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
@@ -151,11 +162,12 @@ getDependencies3 package version =
             Nothing
 
 
+{-| Example 4: conflict resolution with a partial satisfier
 
--- Example 4: conflict resolution with a partial satisfier
--- https://github.com/dart-lang/pub/blob/master/doc/solver.md#conflict-resolution-with-a-partial-satisfier
+<https://github.com/dart-lang/pub/blob/master/doc/solver.md#conflict-resolution-with-a-partial-satisfier>
 
-
+-}
+listAvailableVersions4 : String -> List Version
 listAvailableVersions4 package =
     case package of
         "root" ->
@@ -181,6 +193,8 @@ listAvailableVersions4 package =
             []
 
 
+{-| -}
+getDependencies4 : String -> Version -> Maybe (List ( String, Range ))
 getDependencies4 package version =
     case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
@@ -220,11 +234,12 @@ getDependencies4 package version =
             Nothing
 
 
+{-| Example 5: Linear error reporting
 
--- Example 5: Linear error reporting
--- https://github.com/dart-lang/pub/blob/master/doc/solver.md#linear-error-reporting
+<https://github.com/dart-lang/pub/blob/master/doc/solver.md#linear-error-reporting>
 
-
+-}
+listAvailableVersions5 : String -> List Version
 listAvailableVersions5 package =
     case package of
         "root" ->
@@ -243,6 +258,8 @@ listAvailableVersions5 package =
             []
 
 
+{-| -}
+getDependencies5 : String -> Version -> Maybe (List ( String, Range ))
 getDependencies5 package version =
     case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
@@ -267,11 +284,12 @@ getDependencies5 package version =
             Nothing
 
 
+{-| Example 5 (slightly modified): Linear error reporting
 
--- Example 5 (slightly modified): Linear error reporting
--- https://github.com/dart-lang/pub/blob/master/doc/solver.md#linear-error-reporting
+<https://github.com/dart-lang/pub/blob/master/doc/solver.md#linear-error-reporting>
 
-
+-}
+listAvailableVersions5bis : String -> List Version
 listAvailableVersions5bis package =
     case package of
         "root" ->
@@ -290,6 +308,8 @@ listAvailableVersions5bis package =
             []
 
 
+{-| -}
+getDependencies5bis : String -> Version -> Maybe (List ( String, Range ))
 getDependencies5bis package version =
     case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
@@ -317,11 +337,12 @@ getDependencies5bis package version =
             Nothing
 
 
+{-| Example 6: Branching error reporting
 
--- Example 6: Branching error reporting
--- https://github.com/dart-lang/pub/blob/master/doc/solver.md#branching-error-reporting
+<https://github.com/dart-lang/pub/blob/master/doc/solver.md#branching-error-reporting>
 
-
+-}
+listAvailableVersions6 : String -> List Version
 listAvailableVersions6 package =
     case package of
         "root" ->
@@ -346,6 +367,8 @@ listAvailableVersions6 package =
             []
 
 
+{-| -}
+getDependencies6 : String -> Version -> Maybe (List ( String, Range ))
 getDependencies6 package version =
     case ( package, Version.toTuple version ) of
         ( "root", ( 1, 0, 0 ) ) ->
@@ -380,6 +403,52 @@ getDependencies6 package version =
 
         ( "y", ( 2, 0, 0 ) ) ->
             Just []
+
+        _ ->
+            Nothing
+
+
+{-| Example 7: transitive dependency to incompatible root
+-}
+listAvailableVersions7 : String -> List Version
+listAvailableVersions7 package =
+    case package of
+        "root" ->
+            [ Version.one, Version.two ]
+
+        "bar" ->
+            [ Version.one, Version.two ]
+                |> List.reverse
+
+        "foo" ->
+            [ Version.one, Version.two ]
+                |> List.reverse
+
+        _ ->
+            []
+
+
+{-| -}
+getDependencies7 : String -> Version -> Maybe (List ( String, Range ))
+getDependencies7 package version =
+    case ( package, Version.toTuple version ) of
+        ( "root", ( 1, 0, 0 ) ) ->
+            Just [ ( "bar", Range.higherThan Version.one ) ]
+
+        ( "root", ( 2, 0, 0 ) ) ->
+            Just []
+
+        ( "bar", ( 1, 0, 0 ) ) ->
+            Just [ ( "foo", Range.higherThan Version.one ) ]
+
+        ( "bar", ( 2, 0, 0 ) ) ->
+            Just [ ( "foo", Range.higherThan Version.two ) ]
+
+        ( "foo", ( 1, 0, 0 ) ) ->
+            Just []
+
+        ( "foo", ( 2, 0, 0 ) ) ->
+            Just [ ( "root", Range.higherThan Version.two ) ]
 
         _ ->
             Nothing

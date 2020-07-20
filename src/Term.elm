@@ -148,8 +148,8 @@ listIntersection initial terms =
 
 {-| Check if a set of terms contradicts a given term.
 
-We say that a set of terms S "satisfies"
-a term t if t must be true whenever every term in S is true.
+We say that a set of terms S "contradicts"
+a term t if t must be false whenever every term in S is true.
 
 -}
 contradicts : Term -> List Term -> Bool
@@ -160,8 +160,8 @@ contradicts term set =
 
 {-| Check if a set of terms satisfies a given term.
 
-We say that a set of terms S "contradicts"
-a term t if t must be false whenever every term in S is true.
+We say that a set of terms S "satisfies"
+a term t if t must be true whenever every term in S is true.
 
 -}
 satisfies : Term -> List Term -> Bool
@@ -201,18 +201,7 @@ the union is a positive term.
 -}
 union : Term -> Term -> Term
 union t1 t2 =
-    case ( t1, t2 ) of
-        ( Positive r1, Positive r2 ) ->
-            Positive (Range.union r1 r2)
-
-        ( Positive r1, Negative r2 ) ->
-            Positive (Range.union r1 (Range.negate r2))
-
-        ( Negative r1, Positive r2 ) ->
-            Positive (Range.union (Range.negate r1) r2)
-
-        ( Negative r1, Negative r2 ) ->
-            Negative (Range.intersection r1 r2)
+    negate (intersection (negate t1) (negate t2))
 
 
 {-| Evaluate a term regarding a given choice
