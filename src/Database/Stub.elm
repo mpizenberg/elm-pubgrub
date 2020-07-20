@@ -1,28 +1,30 @@
-module Database.Stub exposing (getDependencies, listAvailableVersions)
+module Database.Stub exposing
+    ( getDependencies1, listAvailableVersions1
+    , getDependencies2, listAvailableVersions2
+    , getDependencies3, listAvailableVersions3
+    , getDependencies4, listAvailableVersions4
+    , getDependencies5, listAvailableVersions5
+    , getDependencies5bis, listAvailableVersions5bis
+    , getDependencies6, listAvailableVersions6
+    , getDependencies7, listAvailableVersions7
+    )
 
 {-| Examples dependencies for algorithm debugging purposes.
 Those should eventually be moved into unit tests.
 
-@docs getDependencies, listAvailableVersions
+@docs getDependencies1, listAvailableVersions1
+@docs getDependencies2, listAvailableVersions2
+@docs getDependencies3, listAvailableVersions3
+@docs getDependencies4, listAvailableVersions4
+@docs getDependencies5, listAvailableVersions5
+@docs getDependencies5bis, listAvailableVersions5bis
+@docs getDependencies6, listAvailableVersions6
+@docs getDependencies7, listAvailableVersions7
 
 -}
 
 import Range exposing (Range)
 import Version exposing (Version)
-
-
-{-| Get the list of dependencies of a given package at a given version.
--}
-getDependencies : String -> Version -> Maybe (List ( String, Range ))
-getDependencies =
-    getDependencies6
-
-
-{-| Get the list of available versions for a given package.
--}
-listAvailableVersions : String -> List Version
-listAvailableVersions =
-    listAvailableVersions6
 
 
 {-| Example 1: no conflict
