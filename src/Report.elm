@@ -1,9 +1,21 @@
-module Report exposing (DerivedIncompat, Incompat, Kind(..), Tree(..), generate)
+module Report exposing
+    ( Tree(..), generate
+    , DerivedIncompat, Incompat, Kind(..)
+    )
 
-{-| We give a ref number to a line either:
+{-| Module dealing with the textual reporting of the issue
+when the solver failed, in the most human-readable possible way.
 
-    - because the second branch is also long
-    - or because it causes two or more derived incompats
+@docs Tree, generate
+
+@docs DerivedIncompat, Incompat, Kind
+
+Some remarks related to the algorithms below.
+
+We give a ref number to a line either:
+
+  - because the second branch is also long
+  - or because it causes two or more derived incompats
 
 A derived can only "already" have a line number ref
 if it is one that causes two or more derived incompatibilities.
@@ -20,17 +32,28 @@ import Range exposing (Range)
 import Term exposing (Term(..))
 
 
+{-| Tree of incompatibilities leading to the root one.
+-}
 type Tree
     = Derived DerivedIncompat
     | External Incompat Kind
 
 
+{-| External incompatibilities are of different kinds.
+It may be that no version exist in a given range,
+or the dependencies of a given package are not available,
+or simply, it may traduct a package dependency.
+-}
 type Kind
     = NoVersion
     | UnavailableDependencies
     | Dependencies
 
 
+{-| Incompatibility derived from two others.
+It may be marked as "shared" if it is present multiple times
+in the derivation tree.
+-}
 type alias DerivedIncompat =
     { incompat : Incompat
     , shared : Bool
@@ -39,6 +62,8 @@ type alias DerivedIncompat =
     }
 
 
+{-| Just an alias for type definitions.
+-}
 type alias Incompat =
     List ( String, Term )
 
@@ -113,6 +138,8 @@ getLineRef derived { sharedWithRef } =
 -- Build the report
 
 
+{-| Generate a human-readable textual report from a derivation tree.
+-}
 generate : Tree -> String
 generate tree =
     buildFromTree tree { refCount = 0, sharedWithRef = Dict.empty, lines = [] }
