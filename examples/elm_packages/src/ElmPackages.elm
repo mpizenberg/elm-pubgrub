@@ -1,4 +1,7 @@
-module Database.History exposing (allPackages)
+module ElmPackages exposing
+    ( allPackages
+    , packageVersionDecoder, packageVersionFromString
+    )
 
 {-| Pre-loaded history of all elm package versions.
 NOT USED YET, I'm still in the debugging phase,
@@ -11,6 +14,42 @@ with handcrafted examples in Database.Stub.
 import Dict exposing (Dict)
 import Elm.Version exposing (Version)
 import Json.Decode exposing (Decoder)
+import Json.Encode
+
+
+packageVersionDecoder : Decoder ( String, Version )
+packageVersionDecoder =
+    Json.Decode.string
+        |> Json.Decode.andThen decodeStringPackageVersion
+
+
+decodeStringPackageVersion : String -> Decoder ( String, Version )
+decodeStringPackageVersion str =
+    case packageVersionFromString str of
+        Ok ( package, elmVersion ) ->
+            Json.Decode.succeed ( package, elmVersion )
+
+        Err err ->
+            Json.Decode.fail err
+
+
+packageVersionFromString : String -> Result String ( String, Version )
+packageVersionFromString str =
+    case String.split "@" str of
+        package :: version :: [] ->
+            case Json.Decode.decodeValue Elm.Version.decoder (Json.Encode.string version) of
+                Ok elmVersion ->
+                    Ok ( package, elmVersion )
+
+                Err err ->
+                    Err (Json.Decode.errorToString err)
+
+        _ ->
+            Err ("Invalid package and version format: " ++ str)
+
+
+
+-- Preloaded history
 
 
 {-| List of all packages exisiting to this moment.
