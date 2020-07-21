@@ -108,6 +108,9 @@ update msg model =
         ( SwitchStrategy strategy, LoadedProject p config ) ->
             ( LoadedProject p { config | strategy = strategy }, Cmd.none )
 
+        ( Solve, LoadedProject project config ) ->
+            ( Debug.todo "TODO", Cmd.none )
+
         -- Packages
         ( Input input, Init _ _ ) ->
             let
