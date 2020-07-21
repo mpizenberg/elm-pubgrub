@@ -15,6 +15,7 @@ import Json.Decode
 import Project exposing (Project)
 import PubGrub
 import Range exposing (Range)
+import Solver
 import Task
 import Version exposing (Version)
 import Widget
@@ -85,7 +86,7 @@ type Msg
 init : () -> ( Model, Cmd Msg )
 init _ =
     -- ( PickedPackage "mpizenberg/elm-pointer-events" Version.one defaultConfig, Cmd.none )
-    ( Model Cache.empty (Init "" Nothing), Cmd.none )
+    ( Model Solver.initCache (Init "" Nothing), Cmd.none )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
