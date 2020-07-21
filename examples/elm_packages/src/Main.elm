@@ -1,6 +1,7 @@
 module Main exposing (main)
 
 import Browser
+import Cache exposing (Cache)
 import Element exposing (Element)
 import Element.Font
 import Element.Input
@@ -35,7 +36,13 @@ main =
 -- TODO: Add the Elm version to the dependencies (0.19 etc)
 
 
-type Model
+type alias Model =
+    { cache : Cache
+    , state : State
+    }
+
+
+type State
     = Init String (Maybe ( String, Version ))
     | InvalidElmJson
     | LoadedProject Project SolverConfig
@@ -78,35 +85,45 @@ type Msg
 init : () -> ( Model, Cmd Msg )
 init _ =
     -- ( PickedPackage "mpizenberg/elm-pointer-events" Version.one defaultConfig, Cmd.none )
-    ( Init "" Nothing, Cmd.none )
+    ( Model Cache.empty (Init "" Nothing), Cmd.none )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case ( msg, model ) of
+    case ( msg, model.state ) of
         ( BackHome, _ ) ->
             init ()
 
         -- elm.json
         ( LoadElmJson, Init _ _ ) ->
-            ( Init "" Nothing, File.Select.file [ "application/json" ] ElmJsonFile )
+            ( { model | state = Init "" Nothing }
+            , File.Select.file [ "application/json" ] ElmJsonFile
+            )
 
         ( ElmJsonFile file, Init _ _ ) ->
-            ( Init "" Nothing, Task.perform ElmJsonContent (File.toString file) )
+            ( { model | state = Init "" Nothing }
+            , Task.perform ElmJsonContent (File.toString file)
+            )
 
         ( ElmJsonContent content, Init _ _ ) ->
             case Json.Decode.decodeString Elm.Project.decoder content of
                 Ok elmProject ->
-                    ( LoadedProject (Project.fromElmProject elmProject) defaultConfig, Cmd.none )
+                    ( { model | state = LoadedProject (Project.fromElmProject elmProject) defaultConfig }
+                    , Cmd.none
+                    )
 
                 Err err ->
-                    ( Error (Json.Decode.errorToString err), Cmd.none )
+                    ( { model | state = Error (Json.Decode.errorToString err) }, Cmd.none )
 
         ( SwitchConnectivity connectivity, LoadedProject p config ) ->
-            ( LoadedProject p { config | connectivity = connectivity }, Cmd.none )
+            ( { model | state = LoadedProject p { config | connectivity = connectivity } }
+            , Cmd.none
+            )
 
         ( SwitchStrategy strategy, LoadedProject p config ) ->
-            ( LoadedProject p { config | strategy = strategy }, Cmd.none )
+            ( { model | state = LoadedProject p { config | strategy = strategy } }
+            , Cmd.none
+            )
 
         ( Solve, LoadedProject project config ) ->
             ( Debug.todo "TODO", Cmd.none )
@@ -119,16 +136,16 @@ update msg model =
                         |> Result.toMaybe
                         |> Maybe.map (Tuple.mapSecond (Version.fromTuple << Elm.Version.toTuple))
             in
-            ( Init input maybePackage, Cmd.none )
+            ( { model | state = Init input maybePackage }, Cmd.none )
 
         ( PickPackage ( package, version ), Init _ _ ) ->
-            ( PickedPackage package version defaultConfig, Cmd.none )
+            ( { model | state = PickedPackage package version defaultConfig }, Cmd.none )
 
         ( SwitchConnectivity connectivity, PickedPackage p v config ) ->
-            ( PickedPackage p v { config | connectivity = connectivity }, Cmd.none )
+            ( { model | state = PickedPackage p v { config | connectivity = connectivity } }, Cmd.none )
 
         ( SwitchStrategy strategy, PickedPackage p v config ) ->
-            ( PickedPackage p v { config | strategy = strategy }, Cmd.none )
+            ( { model | state = PickedPackage p v { config | strategy = strategy } }, Cmd.none )
 
         ( Solve, PickedPackage package version config ) ->
             ( Debug.todo "TODO", Cmd.none )
@@ -149,7 +166,7 @@ view model =
 
 viewElement : Model -> Element Msg
 viewElement model =
-    case model of
+    case model.state of
         Init inputText maybePackage ->
             viewInit inputText maybePackage
 
