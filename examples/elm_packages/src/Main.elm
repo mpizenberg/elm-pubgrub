@@ -108,8 +108,12 @@ update msg model =
             )
 
         ( Solve, LoadedProject project config ) ->
-            Solver.solve project config model.cache
-                |> Debug.todo "TODO"
+            case Solver.solve project config model.cache of
+                ( Solver.Finished (Ok solution), cmd ) ->
+                    ( { model | state = Solution solution }, cmd )
+
+                ( Solver.Finished (Err error), cmd ) ->
+                    ( { model | state = Error error }, cmd )
 
         -- Packages
         ( Input input, Init _ _ ) ->
@@ -161,6 +165,9 @@ viewElement model =
 
         Error error ->
             viewError error
+
+        Solution solution ->
+            viewSolution solution
 
         _ ->
             Debug.todo "TODO"
@@ -392,4 +399,36 @@ viewError error =
             [ backToHomeButton, filler, cacheInfo ]
         , Element.paragraph [ Element.Font.size 24 ]
             [ Element.text "Something went wrong!" ]
+        , Element.paragraph [ Element.Font.family [ Element.Font.monospace ] ]
+            [ Element.text error ]
         ]
+
+
+
+-- Solution
+
+
+viewSolution : List ( String, Version ) -> Element Msg
+viewSolution solution =
+    Element.column
+        [ Element.centerX
+        , Element.spacing 20
+        , Element.width Element.shrink
+        ]
+        [ Element.row [ Element.width Element.fill ]
+            [ backToHomeButton, filler, cacheInfo ]
+        , Element.column []
+            [ Element.el [ Element.Font.size 20 ] (Element.text "Solution:")
+            , Element.el [ Element.padding 20 ] <|
+                if List.isEmpty solution then
+                    Element.text "No dependencies"
+
+                else
+                    Widget.column Material.column (List.map viewVersion solution)
+            ]
+        ]
+
+
+viewVersion : ( String, Version ) -> Element msg
+viewVersion ( package, version ) =
+    Element.text (package ++ " " ++ Version.toDebugString version)

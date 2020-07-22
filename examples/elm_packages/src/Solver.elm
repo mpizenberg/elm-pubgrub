@@ -1,15 +1,17 @@
-module Solver exposing (Config, Strategy(..), defaultConfig, initCache, solve)
+module Solver exposing (Config, State(..), Strategy(..), defaultConfig, initCache, solve)
 
 import Dict
 import Elm.Version
 import ElmPackages
 import Project exposing (Project)
+import PubGrub
 import PubGrub.Cache as Cache exposing (Cache)
-import PubGrub.Version as Version
+import PubGrub.Range as Range exposing (Range)
+import PubGrub.Version as Version exposing (Version)
 
 
-type alias State =
-    ()
+type State
+    = Finished (Result String PubGrub.Solution)
 
 
 type alias Config =
@@ -43,10 +45,47 @@ insertVersions package versions cache =
 
 
 solve : Project -> Config -> Cache -> ( State, Cmd msg )
-solve project config cache =
+solve project { online, strategy } cache =
     case project of
         Project.Package package version dependencies ->
-            Debug.todo "TODO"
+            if online then
+                Debug.todo "TODO"
+
+            else
+                -- TODO: take into account that the root package
+                -- may have updated dependencies compared
+                -- to one that may already be in cache
+                -- (in case working on that package)
+                ( PubGrub.solve (configFrom cache package version dependencies) package version
+                    |> Finished
+                , Cmd.none
+                )
 
         Project.Application dependencies ->
-            Debug.todo "TODO"
+            if online then
+                Debug.todo "TODO"
+
+            else
+                ( PubGrub.solve (configFrom cache "root" Version.one dependencies) "root" Version.one
+                    |> Finished
+                , Cmd.none
+                )
+
+
+configFrom : Cache -> String -> Version -> List ( String, Range ) -> PubGrub.PackagesConfig
+configFrom cache rootPackage rootVersion dependencies =
+    { listAvailableVersions =
+        \package ->
+            if package == rootPackage then
+                [ rootVersion ]
+
+            else
+                Cache.listVersions cache package
+    , getDependencies =
+        \package version ->
+            if package == rootPackage && version == rootVersion then
+                Just dependencies
+
+            else
+                Cache.listDependencies cache package version
+    }
