@@ -1,4 +1,4 @@
-module Database.Stub exposing
+module Examples exposing
     ( getDependencies1, listAvailableVersions1
     , getDependencies2, listAvailableVersions2
     , getDependencies3, listAvailableVersions3
@@ -23,8 +23,8 @@ Those should eventually be moved into unit tests.
 
 -}
 
-import Range exposing (Range)
-import Version exposing (Version)
+import PubGrub.Range as Range exposing (Range)
+import PubGrub.Version as Version exposing (Version)
 
 
 {-| Example 1: no conflict

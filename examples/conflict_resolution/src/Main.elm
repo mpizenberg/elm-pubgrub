@@ -1,12 +1,12 @@
 module Main exposing (main)
 
 import Browser
-import Cache exposing (Cache)
 import Html exposing (Html)
 import Html.Events exposing (onClick)
 import PubGrub
-import Range
-import Version exposing (Version)
+import PubGrub.Cache as Cache exposing (Cache)
+import PubGrub.Range as Range
+import PubGrub.Version as Version exposing (Version)
 
 
 main : Program () Model Msg

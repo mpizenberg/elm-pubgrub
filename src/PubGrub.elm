@@ -106,13 +106,13 @@ when the `SignalEnd result` effect is emitted.
 
 -}
 
-import Cache exposing (Cache)
-import Incompatibility
-import PartialSolution
-import PubGrubCore
-import Range exposing (Range)
-import Term exposing (Term)
-import Version exposing (Version)
+import PubGrub.Cache as Cache exposing (Cache)
+import PubGrub.Core
+import PubGrub.Incompatibility as Incompatibility
+import PubGrub.PartialSolution as PartialSolution
+import PubGrub.Range as Range exposing (Range)
+import PubGrub.Term as Term exposing (Term)
+import PubGrub.Version as Version exposing (Version)
 
 
 
@@ -122,7 +122,7 @@ import Version exposing (Version)
 {-| Internal state of the PubGrub algorithm.
 -}
 type State
-    = State { root : String, pgModel : PubGrubCore.Model }
+    = State { root : String, pgModel : PubGrub.Core.Model }
 
 
 {-| Convert a state into a printable string (for human reading).
@@ -207,7 +207,7 @@ updateEffect : Msg -> State -> ( State, Effect )
 updateEffect msg ((State { root, pgModel }) as state) =
     case msg of
         AvailableVersions package term versions ->
-            case PubGrubCore.pickVersion versions term of
+            case PubGrub.Core.pickVersion versions term of
                 Just version ->
                     ( state, RetrieveDependencies ( package, version ) )
 
@@ -217,7 +217,7 @@ updateEffect msg ((State { root, pgModel }) as state) =
                             Incompatibility.noVersion package term
 
                         updatedModel =
-                            PubGrubCore.mapIncompatibilities (Incompatibility.merge noVersionIncompat) pgModel
+                            PubGrub.Core.mapIncompatibilities (Incompatibility.merge noVersionIncompat) pgModel
                     in
                     solveRec root package updatedModel
 
@@ -229,7 +229,7 @@ updateEffect msg ((State { root, pgModel }) as state) =
                             Incompatibility.unavailableDeps package version
 
                         updatedModel =
-                            PubGrubCore.mapIncompatibilities (Incompatibility.merge unavailableDepsIncompat) pgModel
+                            PubGrub.Core.mapIncompatibilities (Incompatibility.merge unavailableDepsIncompat) pgModel
                     in
                     solveRec root package updatedModel
 
@@ -241,14 +241,14 @@ updateEffect msg ((State { root, pgModel }) as state) =
             ( state, NoEffect )
 
 
-solveRec : String -> String -> PubGrubCore.Model -> ( State, Effect )
+solveRec : String -> String -> PubGrub.Core.Model -> ( State, Effect )
 solveRec root package pgModel =
-    case PubGrubCore.unitPropagation root package pgModel of
+    case PubGrub.Core.unitPropagation root package pgModel of
         Err msg ->
             ( State { root = root, pgModel = pgModel }, SignalEnd (Err msg) )
 
         Ok updatedModel ->
-            case PubGrubCore.pickPackage updatedModel.partialSolution of
+            case PubGrub.Core.pickPackage updatedModel.partialSolution of
                 Nothing ->
                     case PartialSolution.solution updatedModel.partialSolution of
                         Just solution ->
@@ -263,7 +263,7 @@ solveRec root package pgModel =
                     ( State { root = root, pgModel = updatedModel }, ListVersions packageAndTerm )
 
 
-applyDecision : List ( String, Range ) -> String -> Version -> PubGrubCore.Model -> PubGrubCore.Model
+applyDecision : List ( String, Range ) -> String -> Version -> PubGrub.Core.Model -> PubGrub.Core.Model
 applyDecision dependencies package version pgModel =
     let
         depIncompats =
@@ -281,10 +281,10 @@ applyDecision dependencies package version pgModel =
     in
     case PartialSolution.addVersion package version depIncompats pgModel.partialSolution of
         Nothing ->
-            PubGrubCore.setIncompatibilities updatedIncompatibilities pgModel
+            PubGrub.Core.setIncompatibilities updatedIncompatibilities pgModel
 
         Just updatedPartial ->
-            PubGrubCore.Model updatedIncompatibilities updatedPartial
+            PubGrub.Core.Model updatedIncompatibilities updatedPartial
 
 
 
@@ -312,7 +312,7 @@ packagesConfigFromCache cache =
 -}
 solve : PackagesConfig -> String -> Version -> Result String Solution
 solve config root version =
-    solveRec root root (PubGrubCore.init root version)
+    solveRec root root (PubGrub.Core.init root version)
         |> updateUntilFinished config
 
 
@@ -352,7 +352,7 @@ performSync config effect =
 -}
 init : Cache -> String -> Version -> ( State, Effect )
 init cache root version =
-    solveRec root root (PubGrubCore.init root version)
+    solveRec root root (PubGrub.Core.init root version)
         |> tryUpdateCached cache
 
 

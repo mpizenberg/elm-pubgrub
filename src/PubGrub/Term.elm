@@ -1,4 +1,4 @@
-module Term exposing
+module PubGrub.Term exposing
     ( Term(..), isPositive, negate, toDebugString
     , acceptVersion, acceptVersionJust
     , intersection, union, listIntersection
@@ -25,8 +25,8 @@ This module exposes types and functions to deal with terms.
 
 -}
 
-import Range exposing (Range)
-import Version exposing (Version)
+import PubGrub.Range as Range exposing (Range)
+import PubGrub.Version exposing (Version)
 
 
 {-| A positive or negative expression regarding a selection of versions.

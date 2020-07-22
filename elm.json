@@ -5,17 +5,17 @@
     "license": "BSD-3-Clause",
     "version": "1.0.0",
     "exposed-modules": [
-        "Assignment",
-        "Cache",
-        "Incompatibility",
-        "Memory",
-        "PartialSolution",
         "PubGrub",
-        "PubGrubCore",
-        "Range",
-        "Report",
-        "Term",
-        "Version"
+        "PubGrub.Assignment",
+        "PubGrub.Cache",
+        "PubGrub.Core",
+        "PubGrub.Incompatibility",
+        "PubGrub.Memory",
+        "PubGrub.PartialSolution",
+        "PubGrub.Range",
+        "PubGrub.Report",
+        "PubGrub.Term",
+        "PubGrub.Version"
     ],
     "elm-version": "0.19.1 <= v < 0.20.0",
     "dependencies": {

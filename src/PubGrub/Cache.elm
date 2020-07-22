@@ -1,4 +1,4 @@
-module Cache exposing
+module PubGrub.Cache exposing
     ( Cache, empty, size
     , addDependencies, addPackageVersions
     , listVersions, listDependencies
@@ -14,8 +14,8 @@ module Cache exposing
 
 import Array exposing (Array)
 import Dict exposing (Dict)
-import Range exposing (Range)
-import Version exposing (Version)
+import PubGrub.Range exposing (Range)
+import PubGrub.Version as Version exposing (Version)
 
 
 {-| Cache holding already loaded packages information.
