@@ -116,18 +116,22 @@ update cache msg state =
             ( cache, state, Cmd.none )
 
 
-solve : Project -> Config -> Cache -> ( State, Cmd msg )
+solve : Project -> Config -> Cache -> ( State, Cmd API.Msg )
 solve project { online, strategy } cache =
     case project of
+        -- TODO: take into account that the root package
+        -- may have updated dependencies compared
+        -- to one that may already be in cache
+        -- (in case working on that package)
         Project.Package package version dependencies ->
             if online then
-                Debug.todo "TODO"
+                -- TODO: take into account the fact that we know
+                -- direct dependencies of package@version already,
+                -- but without corrupting the cache?
+                PubGrub.init cache package version
+                    |> updateHelper cache
 
             else
-                -- TODO: take into account that the root package
-                -- may have updated dependencies compared
-                -- to one that may already be in cache
-                -- (in case working on that package)
                 ( PubGrub.solve (configFrom cache package version dependencies) package version
                     |> Finished
                 , Cmd.none

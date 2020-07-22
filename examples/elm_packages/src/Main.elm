@@ -78,8 +78,8 @@ init _ =
 
 initialState : State
 initialState =
-    -- Init "" Nothing
-    PickedPackage "elm/bytes" (Version.new_ 1 0 8) Solver.defaultConfig
+    -- PickedPackage "elm/bytes" (Version.new_ 1 0 8) Solver.defaultConfig
+    Init "" Nothing
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -123,13 +123,13 @@ update msg model =
         ( Solve, LoadedProject project config ) ->
             case Solver.solve project config model.cache of
                 ( Solver.Finished (Ok solution), cmd ) ->
-                    ( { model | state = Solution solution }, cmd )
+                    ( { model | state = Solution solution }, Cmd.map ApiMsg cmd )
 
                 ( Solver.Finished (Err error), cmd ) ->
-                    ( { model | state = Error error }, cmd )
+                    ( { model | state = Error error }, Cmd.map ApiMsg cmd )
 
                 ( solverState, cmd ) ->
-                    ( { model | state = Solving solverState }, cmd )
+                    ( { model | state = Solving solverState }, Cmd.map ApiMsg cmd )
 
         -- Packages
         ( Input input, Init _ _ ) ->
