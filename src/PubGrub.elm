@@ -2,7 +2,7 @@ module PubGrub exposing
     ( Solution
     , PackagesConfig, solve
     , State, stateToString, Effect(..), effectToString, Msg(..)
-    , Connectivity(..), init, update
+    , init, update
     )
 
 {-| PubGrub version solving algorithm.
@@ -75,7 +75,7 @@ For this reason, it is possible to run the PubGrub algorithm step by step.
 Every time an effect may be required, it stops and informs the caller,
 which may resume the algorithm once necessary data is loaded.
 
-    PubGrub.update : Connectivity -> Cache -> Msg -> State -> ( State, Effect )
+    PubGrub.update : Cache -> Msg -> State -> ( State, Effect )
 
 The `Effect` type is public to enable the caller to perform
 the required task before resuming.
@@ -83,8 +83,7 @@ The `Msg` type is also public to drive the algorithm according
 to what was expected in the last effect when resuming.
 
 At any point between two `update` calls,
-the caller can change the `Connectivity`
-and update the `Cache` of already loaded data.
+the caller can update the `Cache` of already loaded data.
 
 The algorithm informs the caller that all is done
 when the `SignalEnd result` effect is emitted.
@@ -103,7 +102,7 @@ when the `SignalEnd result` effect is emitted.
 # Async
 
 @docs State, stateToString, Effect, effectToString, Msg
-@docs Connectivity, init, update
+@docs init, update
 
 -}
 
@@ -124,11 +123,6 @@ import Version exposing (Version)
 -}
 type State
     = State { root : String, pgModel : PubGrubCore.Model }
-
-
-
--- { incompatibilities : List Incompatibility
--- , partialSolution : PartialSolution
 
 
 {-| Convert a state into a printable string (for human reading).
@@ -345,78 +339,34 @@ performSync config effect =
 -- ASYNC #############################################################
 
 
-{-| Online or Offline.
-
-In Offline mode, the `ListVersions` effect is never emitted
-because we never know if a new version or not may be available,
-and thus if the cache contains or not all available versions.
-It will always use the list of versions available in cache.
-
-In Offline mode, the `RetrieveDependencies` effect is never emitted.
-Either the dependencies are known and it will continue,
-or they aren't and it will signal a failure.
-
--}
-type Connectivity
-    = Online
-    | Offline
-
-
 {-| Initialize PubGrub algorithm.
 -}
-init : Connectivity -> Cache -> String -> Version -> ( State, Effect )
-init connectivity cache root version =
+init : Cache -> String -> Version -> ( State, Effect )
+init cache root version =
     solveRec root root (PubGrubCore.init root version)
-        |> tryUpdateCached connectivity cache
+        |> tryUpdateCached cache
 
 
 {-| Update the state of the PubGrub algorithm.
 -}
-update : Connectivity -> Cache -> Msg -> State -> ( State, Effect )
-update connectivity cache msg state =
+update : Cache -> Msg -> State -> ( State, Effect )
+update cache msg state =
     updateEffect msg state
-        |> tryUpdateCached connectivity cache
+        |> tryUpdateCached cache
 
 
-tryUpdateCached : Connectivity -> Cache -> ( State, Effect ) -> ( State, Effect )
-tryUpdateCached connectivity cache stateAndEffect =
+tryUpdateCached : Cache -> ( State, Effect ) -> ( State, Effect )
+tryUpdateCached cache stateAndEffect =
     case stateAndEffect of
-        ( _, NoEffect ) ->
-            stateAndEffect
-
-        ( _, SignalEnd _ ) ->
-            stateAndEffect
-
-        ( state, ListVersions ( package, term ) ) ->
-            case connectivity of
-                Online ->
-                    stateAndEffect
-
-                Offline ->
-                    let
-                        versions =
-                            Cache.listVersions package cache
-
-                        msg =
-                            AvailableVersions package term versions
-                    in
-                    update connectivity cache msg state
-
         ( (State { root, pgModel }) as state, RetrieveDependencies ( package, version ) ) ->
             case Cache.listDependencies package version cache of
-                Nothing ->
-                    case connectivity of
-                        Online ->
-                            stateAndEffect
-
-                        Offline ->
-                            let
-                                msg =
-                                    PackageDependencies package version Nothing
-                            in
-                            update connectivity cache msg state
-
                 Just deps ->
                     applyDecision deps package version pgModel
                         |> solveRec root package
-                        |> tryUpdateCached connectivity cache
+                        |> tryUpdateCached cache
+
+                Nothing ->
+                    stateAndEffect
+
+        _ ->
+            stateAndEffect
