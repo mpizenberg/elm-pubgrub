@@ -44,7 +44,6 @@ type alias Model =
 
 type State
     = Init String (Maybe ( String, Version ))
-    | InvalidElmJson
     | LoadedProject Project Solver.Config
     | PickedPackage String Version Solver.Config
     | Error String
@@ -168,9 +167,6 @@ viewElement model =
 
         Solution solution ->
             viewSolution solution
-
-        _ ->
-            Debug.todo "TODO"
 
 
 
