@@ -4,8 +4,8 @@ import Elm.Constraint
 import Elm.Package
 import Elm.Project
 import Elm.Version
-import Range exposing (Range)
-import Version exposing (Version)
+import PubGrub.Range as Range exposing (Range)
+import PubGrub.Version as Version exposing (Version)
 
 
 

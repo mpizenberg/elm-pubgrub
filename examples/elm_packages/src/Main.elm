@@ -1,7 +1,6 @@
 module Main exposing (main)
 
 import Browser
-import Cache exposing (Cache)
 import Element exposing (Element)
 import Element.Font
 import Element.Input
@@ -13,11 +12,11 @@ import File.Select
 import Html exposing (Html)
 import Json.Decode
 import Project exposing (Project)
-import PubGrub
-import Range exposing (Range)
+import PubGrub.Cache exposing (Cache)
+import PubGrub.Range as Range exposing (Range)
+import PubGrub.Version as Version exposing (Version)
 import Solver
 import Task
-import Version exposing (Version)
 import Widget
 import Widget.Style
 import Widget.Style.Material as Material
@@ -60,7 +59,7 @@ type Msg
     | ElmJsonContent String
     | Input String
     | PickPackage ( String, Version )
-    | SwitchConnectivity PubGrub.Connectivity
+    | SwitchConnectivity
     | SwitchStrategy Solver.Strategy
     | Solve
 
@@ -98,8 +97,8 @@ update msg model =
                 Err err ->
                     ( { model | state = Error (Json.Decode.errorToString err) }, Cmd.none )
 
-        ( SwitchConnectivity connectivity, LoadedProject p config ) ->
-            ( { model | state = LoadedProject p { config | connectivity = connectivity } }
+        ( SwitchConnectivity, LoadedProject p config ) ->
+            ( { model | state = LoadedProject p { config | online = not config.online } }
             , Cmd.none
             )
 
@@ -109,7 +108,8 @@ update msg model =
             )
 
         ( Solve, LoadedProject project config ) ->
-            ( Debug.todo "TODO", Cmd.none )
+            Solver.solve project config model.cache
+                |> Debug.todo "TODO"
 
         -- Packages
         ( Input input, Init _ _ ) ->
@@ -124,8 +124,8 @@ update msg model =
         ( PickPackage ( package, version ), Init _ _ ) ->
             ( { model | state = PickedPackage package version Solver.defaultConfig }, Cmd.none )
 
-        ( SwitchConnectivity connectivity, PickedPackage p v config ) ->
-            ( { model | state = PickedPackage p v { config | connectivity = connectivity } }, Cmd.none )
+        ( SwitchConnectivity, PickedPackage p v config ) ->
+            ( { model | state = PickedPackage p v { config | online = not config.online } }, Cmd.none )
 
         ( SwitchStrategy strategy, PickedPackage p v config ) ->
             ( { model | state = PickedPackage p v { config | strategy = strategy } }, Cmd.none )
@@ -247,31 +247,26 @@ solveButton =
 
 
 viewConfig : Solver.Config -> Element Msg
-viewConfig { connectivity, strategy } =
+viewConfig { online, strategy } =
     Element.row [ Element.spacing 20 ]
         [ Element.text "Connectivity:"
-        , viewConnectivity connectivity
+        , viewConnectivity online
         , Element.text "Version strategy:"
         , viewStrategy strategy
         ]
 
 
-viewConnectivity : PubGrub.Connectivity -> Element Msg
-viewConnectivity connectivity =
+viewConnectivity : Bool -> Element Msg
+viewConnectivity online =
     rowChoice
         { selected =
-            if connectivity == PubGrub.Offline then
-                Just 0
+            if online then
+                Just 1
 
             else
-                Just 1
+                Just 0
         , onSelect =
-            \id ->
-                if id == 0 then
-                    Just (SwitchConnectivity PubGrub.Offline)
-
-                else
-                    Just (SwitchConnectivity PubGrub.Online)
+            always (Just SwitchConnectivity)
         , options =
             [ { text = "Offline", icon = Element.none }
             , { text = "Online", icon = Element.none }

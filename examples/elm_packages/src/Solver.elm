@@ -1,15 +1,19 @@
-module Solver exposing (Config, Strategy(..), defaultConfig, initCache)
+module Solver exposing (Config, Strategy(..), defaultConfig, initCache, solve)
 
-import Cache exposing (Cache)
 import Dict
 import Elm.Version
 import ElmPackages
-import PubGrub
-import Version
+import Project exposing (Project)
+import PubGrub.Cache as Cache exposing (Cache)
+import PubGrub.Version as Version
+
+
+type alias State =
+    ()
 
 
 type alias Config =
-    { connectivity : PubGrub.Connectivity
+    { online : Bool
     , strategy : Strategy
     }
 
@@ -21,7 +25,7 @@ type Strategy
 
 defaultConfig : Config
 defaultConfig =
-    { connectivity = PubGrub.Offline
+    { online = False
     , strategy = Newest
     }
 
@@ -36,3 +40,13 @@ insertVersions package versions cache =
     List.map (Elm.Version.toTuple >> Version.fromTuple) versions
         |> List.map (\v -> ( package, v ))
         |> (\l -> Cache.addPackageVersions l cache)
+
+
+solve : Project -> Config -> Cache -> ( State, Cmd msg )
+solve project config cache =
+    case project of
+        Project.Package package version dependencies ->
+            Debug.todo "TODO"
+
+        Project.Application dependencies ->
+            Debug.todo "TODO"
