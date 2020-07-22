@@ -60,7 +60,7 @@ type Msg
     | ElmJsonContent String
     | Input String
     | PickPackage ( String, Version )
-    | SwitchConnectivity
+    | SwitchConnectivity Bool
     | SwitchStrategy Solver.Strategy
     | Solve
     | ApiMsg API.Msg
@@ -109,8 +109,8 @@ update msg model =
                 Err err ->
                     ( { model | state = Error (Json.Decode.errorToString err) }, Cmd.none )
 
-        ( SwitchConnectivity, LoadedProject p config ) ->
-            ( { model | state = LoadedProject p { config | online = not config.online } }
+        ( SwitchConnectivity online, LoadedProject p config ) ->
+            ( { model | state = LoadedProject p { config | online = online } }
             , Cmd.none
             )
 
@@ -143,8 +143,8 @@ update msg model =
         ( PickPackage ( package, version ), Init _ _ ) ->
             ( { model | state = PickedPackage package version Solver.defaultConfig }, Cmd.none )
 
-        ( SwitchConnectivity, PickedPackage p v config ) ->
-            ( { model | state = PickedPackage p v { config | online = not config.online } }, Cmd.none )
+        ( SwitchConnectivity online, PickedPackage p v config ) ->
+            ( { model | state = PickedPackage p v { config | online = online } }, Cmd.none )
 
         ( SwitchStrategy strategy, PickedPackage p v config ) ->
             ( { model | state = PickedPackage p v { config | strategy = strategy } }, Cmd.none )
@@ -308,7 +308,12 @@ viewConnectivity online =
             else
                 Just 0
         , onSelect =
-            always (Just SwitchConnectivity)
+            \id ->
+                if id == 0 then
+                    Just (SwitchConnectivity False)
+
+                else
+                    Just (SwitchConnectivity True)
         , options =
             [ { text = "Offline", icon = Element.none }
             , { text = "Online", icon = Element.none }
