@@ -13,6 +13,7 @@ import File.Select
 import Html exposing (Html)
 import Json.Decode
 import Project exposing (Project)
+import PubGrub
 import PubGrub.Cache exposing (Cache)
 import PubGrub.Range as Range exposing (Range)
 import PubGrub.Version as Version exposing (Version)
@@ -439,6 +440,14 @@ viewSolving solverState =
             [ backToHomeButton, filler, cacheInfo ]
         , Element.paragraph [ Element.Font.size 24 ]
             [ Element.text "Solving ..." ]
+        , Element.paragraph [ Element.padding 20 ]
+            [ case solverState of
+                Solver.Solving _ effect ->
+                    Element.text ("Current effect being performed: " ++ PubGrub.effectToString effect)
+
+                _ ->
+                    Element.none
+            ]
         ]
 
 

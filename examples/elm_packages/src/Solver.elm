@@ -13,7 +13,7 @@ import PubGrub.Version as Version exposing (Version)
 
 type State
     = Finished (Result String PubGrub.Solution)
-    | Solving PubGrub.State
+    | Solving PubGrub.State PubGrub.Effect
 
 
 type alias Config =
@@ -63,7 +63,7 @@ updateHelper : Cache -> ( PubGrub.State, PubGrub.Effect ) -> ( State, Cmd API.Ms
 updateHelper cache ( pgState, effect ) =
     case effect of
         PubGrub.NoEffect ->
-            ( Solving pgState, Cmd.none )
+            ( Solving pgState effect, Cmd.none )
 
         -- TODO: only update the list of packages and versions once at startup
         PubGrub.ListVersions ( package, term ) ->
@@ -78,7 +78,7 @@ updateHelper cache ( pgState, effect ) =
                 |> updateHelper cache
 
         PubGrub.RetrieveDependencies ( package, version ) ->
-            ( Solving pgState, API.getDependencies package version )
+            ( Solving pgState effect, API.getDependencies package version )
 
         PubGrub.SignalEnd result ->
             ( Finished result, Cmd.none )
@@ -87,7 +87,7 @@ updateHelper cache ( pgState, effect ) =
 update : Cache -> API.Msg -> State -> ( Cache, State, Cmd API.Msg )
 update cache msg state =
     case ( msg, state ) of
-        ( API.GotDeps package version (Ok elmProject), Solving pgState ) ->
+        ( API.GotDeps package version (Ok elmProject), Solving pgState _ ) ->
             let
                 dependencies =
                     case Project.fromElmProject elmProject of
@@ -109,7 +109,7 @@ update cache msg state =
             in
             ( newCache, newPgState, effect )
 
-        ( API.GotDeps _ _ (Err httpError), Solving _ ) ->
+        ( API.GotDeps _ _ (Err httpError), Solving _ _ ) ->
             ( cache, Finished (Err <| Debug.toString httpError), Cmd.none )
 
         _ ->
