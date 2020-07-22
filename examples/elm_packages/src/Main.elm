@@ -134,7 +134,12 @@ update msg model =
             ( { model | state = PickedPackage p v { config | strategy = strategy } }, Cmd.none )
 
         ( Solve, PickedPackage package version config ) ->
-            ( Debug.todo "TODO", Cmd.none )
+            case Solver.solvePackage package version config model.cache of
+                ( Solver.Finished (Ok solution), cmd ) ->
+                    ( { model | state = Solution solution }, cmd )
+
+                ( Solver.Finished (Err error), cmd ) ->
+                    ( { model | state = Error error }, cmd )
 
         _ ->
             ( model, Cmd.none )

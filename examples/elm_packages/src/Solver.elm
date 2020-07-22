@@ -1,4 +1,4 @@
-module Solver exposing (Config, State(..), Strategy(..), defaultConfig, initCache, solve)
+module Solver exposing (Config, State(..), Strategy(..), defaultConfig, initCache, solve, solvePackage)
 
 import Dict
 import Elm.Version
@@ -42,6 +42,18 @@ insertVersions package versions cache =
     List.map (Elm.Version.toTuple >> Version.fromTuple) versions
         |> List.map (\v -> ( package, v ))
         |> (\l -> Cache.addPackageVersions l cache)
+
+
+solvePackage : String -> Version -> Config -> Cache -> ( State, Cmd msg )
+solvePackage package version { online, strategy } cache =
+    if online then
+        Debug.todo "TODO"
+
+    else
+        ( PubGrub.solve (PubGrub.packagesConfigFromCache cache) package version
+            |> Finished
+        , Cmd.none
+        )
 
 
 solve : Project -> Config -> Cache -> ( State, Cmd msg )
