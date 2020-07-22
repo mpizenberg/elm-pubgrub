@@ -20,9 +20,14 @@ main =
 
 
 type Model
-    = Init PubGrub.Connectivity
+    = Init Connectivity
     | Solving ( PubGrub.State, PubGrub.Effect )
     | Solved (Result String PubGrub.Solution)
+
+
+type Connectivity
+    = Offline
+    | Online
 
 
 type Msg
@@ -33,63 +38,56 @@ type Msg
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( Init PubGrub.Online, Cmd.none )
+    ( Init Online, Cmd.none )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( msg, model ) of
         ( SwitchConnectivity, Init connectivity ) ->
-            if connectivity == PubGrub.Online then
-                ( Init PubGrub.Offline, Cmd.none )
-
-            else
-                ( Init PubGrub.Online, Cmd.none )
+            ( Init connectivity, Cmd.none )
 
         ( Solve, Init connectivity ) ->
-            let
-                actualCache =
-                    if connectivity == PubGrub.Offline then
-                        cache
+            case connectivity of
+                Offline ->
+                    ( PubGrub.solve (PubGrub.packagesConfigFromCache cache) "root" Version.one
+                        |> Solved
+                    , Cmd.none
+                    )
 
-                    else
-                        Cache.empty
+                Online ->
+                    case PubGrub.init Cache.empty "root" Version.one of
+                        ( _, PubGrub.SignalEnd result ) ->
+                            ( Solved result, Cmd.none )
 
-                ( state, effect ) =
-                    PubGrub.init connectivity actualCache "root" Version.one
-            in
-            case effect of
-                PubGrub.SignalEnd result ->
-                    ( Solved result, Cmd.none )
-
-                _ ->
-                    ( Solving ( state, effect ), Cmd.none )
+                        stateAndEffect ->
+                            ( Solving stateAndEffect, Cmd.none )
 
         ( Simulate, Solving ( state, effect ) ) ->
             case effect of
                 PubGrub.ListVersions ( package, term ) ->
                     let
                         versions =
-                            Cache.listVersions package cache
+                            Cache.listVersions cache package
 
                         pgMsg =
                             PubGrub.AvailableVersions package term versions
 
                         newStateAndEffect =
-                            PubGrub.update PubGrub.Online Cache.empty pgMsg state
+                            PubGrub.update Cache.empty pgMsg state
                     in
                     ( Solving newStateAndEffect, Cmd.none )
 
                 PubGrub.RetrieveDependencies ( package, version ) ->
                     let
                         dependencies =
-                            Cache.listDependencies package version cache
+                            Cache.listDependencies cache package version
 
                         pgMsg =
                             PubGrub.PackageDependencies package version dependencies
 
                         newStateAndEffect =
-                            PubGrub.update PubGrub.Online Cache.empty pgMsg state
+                            PubGrub.update Cache.empty pgMsg state
                     in
                     ( Solving newStateAndEffect, Cmd.none )
 
