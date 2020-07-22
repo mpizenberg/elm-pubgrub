@@ -1,10 +1,29 @@
-module Solver exposing (initCache)
+module Solver exposing (Config, Strategy(..), defaultConfig, initCache)
 
 import Cache exposing (Cache)
 import Dict
 import Elm.Version
 import ElmPackages
+import PubGrub
 import Version
+
+
+type alias Config =
+    { connectivity : PubGrub.Connectivity
+    , strategy : Strategy
+    }
+
+
+type Strategy
+    = Newest
+    | Oldest
+
+
+defaultConfig : Config
+defaultConfig =
+    { connectivity = PubGrub.Offline
+    , strategy = Newest
+    }
 
 
 initCache : Cache

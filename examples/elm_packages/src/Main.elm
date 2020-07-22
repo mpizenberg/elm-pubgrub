@@ -46,28 +46,10 @@ type alias Model =
 type State
     = Init String (Maybe ( String, Version ))
     | InvalidElmJson
-    | LoadedProject Project SolverConfig
-    | PickedPackage String Version SolverConfig
+    | LoadedProject Project Solver.Config
+    | PickedPackage String Version Solver.Config
     | Error String
     | Solution (List ( String, Version ))
-
-
-type alias SolverConfig =
-    { connectivity : PubGrub.Connectivity
-    , strategy : Strategy
-    }
-
-
-defaultConfig : SolverConfig
-defaultConfig =
-    { connectivity = PubGrub.Offline
-    , strategy = Newest
-    }
-
-
-type Strategy
-    = Newest
-    | Oldest
 
 
 type Msg
@@ -79,7 +61,7 @@ type Msg
     | Input String
     | PickPackage ( String, Version )
     | SwitchConnectivity PubGrub.Connectivity
-    | SwitchStrategy Strategy
+    | SwitchStrategy Solver.Strategy
     | Solve
 
 
@@ -109,7 +91,7 @@ update msg model =
         ( ElmJsonContent content, Init _ _ ) ->
             case Json.Decode.decodeString Elm.Project.decoder content of
                 Ok elmProject ->
-                    ( { model | state = LoadedProject (Project.fromElmProject elmProject) defaultConfig }
+                    ( { model | state = LoadedProject (Project.fromElmProject elmProject) Solver.defaultConfig }
                     , Cmd.none
                     )
 
@@ -140,7 +122,7 @@ update msg model =
             ( { model | state = Init input maybePackage }, Cmd.none )
 
         ( PickPackage ( package, version ), Init _ _ ) ->
-            ( { model | state = PickedPackage package version defaultConfig }, Cmd.none )
+            ( { model | state = PickedPackage package version Solver.defaultConfig }, Cmd.none )
 
         ( SwitchConnectivity connectivity, PickedPackage p v config ) ->
             ( { model | state = PickedPackage p v { config | connectivity = connectivity } }, Cmd.none )
@@ -217,7 +199,7 @@ viewInit inputText maybePackage =
 -- Picked
 
 
-viewPicked : SolverConfig -> String -> Version -> Element Msg
+viewPicked : Solver.Config -> String -> Version -> Element Msg
 viewPicked config package version =
     Element.column
         [ Element.centerX
@@ -264,7 +246,7 @@ solveButton =
         |> Element.el [ Element.centerX ]
 
 
-viewConfig : SolverConfig -> Element Msg
+viewConfig : Solver.Config -> Element Msg
 viewConfig { connectivity, strategy } =
     Element.row [ Element.spacing 20 ]
         [ Element.text "Connectivity:"
@@ -297,11 +279,11 @@ viewConnectivity connectivity =
         }
 
 
-viewStrategy : Strategy -> Element Msg
+viewStrategy : Solver.Strategy -> Element Msg
 viewStrategy strategy =
     rowChoice
         { selected =
-            if strategy == Newest then
+            if strategy == Solver.Newest then
                 Just 0
 
             else
@@ -309,10 +291,10 @@ viewStrategy strategy =
         , onSelect =
             \id ->
                 if id == 0 then
-                    Just (SwitchStrategy Newest)
+                    Just (SwitchStrategy Solver.Newest)
 
                 else
-                    Just (SwitchStrategy Oldest)
+                    Just (SwitchStrategy Solver.Oldest)
         , options =
             [ { text = "Newest", icon = Element.none }
             , { text = "Oldest", icon = Element.none }
@@ -341,7 +323,7 @@ materialButtonRow =
 -- Project
 
 
-viewProject : SolverConfig -> Project -> Element Msg
+viewProject : Solver.Config -> Project -> Element Msg
 viewProject config project =
     Element.column
         [ Element.centerX
