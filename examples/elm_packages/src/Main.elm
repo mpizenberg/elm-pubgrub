@@ -69,19 +69,24 @@ type Msg
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { cache = Solver.initCache
-      , state = PickedPackage "elm/bytes" (Version.new_ 1 0 8) Solver.defaultConfig
-
-      -- , Init "" Nothing
+      , state = initialState
       }
     , Cmd.none
     )
+
+
+initialState : State
+initialState =
+    -- Init "" Nothing
+    PickedPackage "elm/bytes" (Version.new_ 1 0 8) Solver.defaultConfig
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( msg, model.state ) of
         ( BackHome, _ ) ->
-            init ()
+            -- Keep cache, just restore initial state
+            ( { model | state = initialState }, Cmd.none )
 
         -- elm.json
         ( LoadElmJson, Init _ _ ) ->
@@ -157,15 +162,15 @@ update msg model =
 
         -- Solving
         ( ApiMsg apiMsg, Solving solverState ) ->
-            case Solver.update apiMsg solverState of
-                ( Solver.Finished (Ok solution), _ ) ->
-                    ( { model | state = Solution solution }, Cmd.none )
+            case Solver.update model.cache apiMsg solverState of
+                ( newCache, Solver.Finished (Ok solution), _ ) ->
+                    ( { cache = newCache, state = Solution solution }, Cmd.none )
 
-                ( Solver.Finished (Err error), _ ) ->
-                    ( { model | state = Error error }, Cmd.none )
+                ( newCache, Solver.Finished (Err error), _ ) ->
+                    ( { cache = newCache, state = Error error }, Cmd.none )
 
-                ( newSolverState, cmd ) ->
-                    ( { model | state = Solving newSolverState }, Cmd.map ApiMsg cmd )
+                ( newCache, newSolverState, cmd ) ->
+                    ( { cache = newCache, state = Solving newSolverState }, Cmd.map ApiMsg cmd )
 
         _ ->
             ( model, Cmd.none )

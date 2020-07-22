@@ -84,15 +84,36 @@ updateHelper cache ( pgState, effect ) =
             ( Finished result, Cmd.none )
 
 
-update : API.Msg -> State -> ( State, Cmd API.Msg )
-update msg state =
-    case msg of
-        API.GotDeps (Ok content) ->
-            -- TODO: change this (this is for debug)
-            ( Finished (Err content), Cmd.none )
+update : Cache -> API.Msg -> State -> ( Cache, State, Cmd API.Msg )
+update cache msg state =
+    case ( msg, state ) of
+        ( API.GotDeps package version (Ok elmProject), Solving pgState ) ->
+            let
+                dependencies =
+                    case Project.fromElmProject elmProject of
+                        Project.Package _ _ deps ->
+                            deps
 
-        API.GotDeps (Err httpError) ->
-            ( Finished (Err <| Debug.toString httpError), Cmd.none )
+                        Project.Application deps ->
+                            deps
+
+                newCache =
+                    Cache.addDependencies package version dependencies cache
+
+                pgMsg =
+                    PubGrub.PackageDependencies package version (Just dependencies)
+
+                ( newPgState, effect ) =
+                    PubGrub.update newCache pgMsg pgState
+                        |> updateHelper newCache
+            in
+            ( newCache, newPgState, effect )
+
+        ( API.GotDeps _ _ (Err httpError), Solving _ ) ->
+            ( cache, Finished (Err <| Debug.toString httpError), Cmd.none )
+
+        _ ->
+            ( cache, state, Cmd.none )
 
 
 solve : Project -> Config -> Cache -> ( State, Cmd msg )
