@@ -365,7 +365,7 @@ update cache msg state =
 tryUpdateCached : Cache -> ( State, Effect ) -> ( State, Effect )
 tryUpdateCached cache stateAndEffect =
     case stateAndEffect of
-        ( (State { root, pgModel }) as state, RetrieveDependencies ( package, version ) ) ->
+        ( State { root, pgModel }, RetrieveDependencies ( package, version ) ) ->
             case Cache.listDependencies cache package version of
                 Just deps ->
                     applyDecision deps package version pgModel
