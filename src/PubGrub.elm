@@ -1,6 +1,6 @@
 module PubGrub exposing
     ( Solution
-    , PackagesConfig, solve
+    , PackagesConfig, solve, packagesConfigFromCache
     , State, stateToString, Effect(..), effectToString, Msg(..)
     , init, update
     )
@@ -96,7 +96,7 @@ when the `SignalEnd result` effect is emitted.
 
 # Sync
 
-@docs PackagesConfig, solve
+@docs PackagesConfig, solve, packagesConfigFromCache
 
 
 # Async
@@ -299,6 +299,8 @@ type alias PackagesConfig =
     }
 
 
+{-| Convenient conversion of a cache into available packages configuration.
+-}
 packagesConfigFromCache : Cache -> PackagesConfig
 packagesConfigFromCache cache =
     { listAvailableVersions = Cache.listVersions cache
