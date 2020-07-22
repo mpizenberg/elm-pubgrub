@@ -301,8 +301,8 @@ type alias PackagesConfig =
 
 packagesConfigFromCache : Cache -> PackagesConfig
 packagesConfigFromCache cache =
-    { listAvailableVersions = \package -> Cache.listVersions package cache
-    , getDependencies = \package version -> Cache.listDependencies package version cache
+    { listAvailableVersions = Cache.listVersions cache
+    , getDependencies = Cache.listDependencies cache
     }
 
 
@@ -366,7 +366,7 @@ tryUpdateCached : Cache -> ( State, Effect ) -> ( State, Effect )
 tryUpdateCached cache stateAndEffect =
     case stateAndEffect of
         ( (State { root, pgModel }) as state, RetrieveDependencies ( package, version ) ) ->
-            case Cache.listDependencies package version cache of
+            case Cache.listDependencies cache package version of
                 Just deps ->
                     applyDecision deps package version pgModel
                         |> solveRec root package

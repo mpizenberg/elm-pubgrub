@@ -103,16 +103,14 @@ addPackageVersion ( package, version ) ( raw, packages ) =
 
 {-| List available versions of a package already in cache.
 -}
-listVersions : String -> Cache -> List Version
-listVersions package (Cache { packages }) =
-    -- TODO: put the cache as first argument
+listVersions : Cache -> String -> List Version
+listVersions (Cache { packages }) package =
     Dict.get package packages
         |> Maybe.withDefault []
 
 
 {-| List dependencies of a given package.
 -}
-listDependencies : String -> Version -> Cache -> Maybe (List ( String, Range ))
-listDependencies package version (Cache { dependencies }) =
-    -- TODO: put the cache as first argument
+listDependencies : Cache -> String -> Version -> Maybe (List ( String, Range ))
+listDependencies (Cache { dependencies }) package version =
     Dict.get ( package, Version.toTuple version ) dependencies
