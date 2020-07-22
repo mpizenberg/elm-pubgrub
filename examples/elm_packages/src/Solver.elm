@@ -1,5 +1,6 @@
-module Solver exposing (Config, State(..), Strategy(..), defaultConfig, initCache, solve, solvePackage)
+module Solver exposing (Config, State(..), Strategy(..), defaultConfig, initCache, solve, solvePackage, update)
 
+import API
 import Dict
 import Elm.Version
 import ElmPackages
@@ -12,6 +13,7 @@ import PubGrub.Version as Version exposing (Version)
 
 type State
     = Finished (Result String PubGrub.Solution)
+    | Solving PubGrub.State
 
 
 type alias Config =
@@ -44,16 +46,53 @@ insertVersions package versions cache =
         |> (\l -> Cache.addPackageVersions l cache)
 
 
-solvePackage : String -> Version -> Config -> Cache -> ( State, Cmd msg )
-solvePackage package version { online, strategy } cache =
+solvePackage : String -> Version -> Config -> Cache -> ( State, Cmd API.Msg )
+solvePackage root rootVersion { online, strategy } cache =
     if online then
-        Debug.todo "TODO"
+        PubGrub.init cache root rootVersion
+            |> updateHelper cache
 
     else
-        ( PubGrub.solve (PubGrub.packagesConfigFromCache cache) package version
+        ( PubGrub.solve (PubGrub.packagesConfigFromCache cache) root rootVersion
             |> Finished
         , Cmd.none
         )
+
+
+updateHelper : Cache -> ( PubGrub.State, PubGrub.Effect ) -> ( State, Cmd API.Msg )
+updateHelper cache ( pgState, effect ) =
+    case effect of
+        PubGrub.NoEffect ->
+            ( Solving pgState, Cmd.none )
+
+        -- TODO: only update the list of packages and versions once at startup
+        PubGrub.ListVersions ( package, term ) ->
+            let
+                versions =
+                    Cache.listVersions cache package
+
+                msg =
+                    PubGrub.AvailableVersions package term versions
+            in
+            PubGrub.update cache msg pgState
+                |> updateHelper cache
+
+        PubGrub.RetrieveDependencies ( package, version ) ->
+            ( Solving pgState, API.getDependencies package version )
+
+        PubGrub.SignalEnd result ->
+            ( Finished result, Cmd.none )
+
+
+update : API.Msg -> State -> ( State, Cmd API.Msg )
+update msg state =
+    case msg of
+        API.GotDeps (Ok content) ->
+            -- TODO: change this (this is for debug)
+            ( Finished (Err content), Cmd.none )
+
+        API.GotDeps (Err httpError) ->
+            ( Finished (Err <| Debug.toString httpError), Cmd.none )
 
 
 solve : Project -> Config -> Cache -> ( State, Cmd msg )

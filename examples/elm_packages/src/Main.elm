@@ -1,5 +1,6 @@
 module Main exposing (main)
 
+import API
 import Browser
 import Element exposing (Element)
 import Element.Font
@@ -46,6 +47,7 @@ type State
     = Init String (Maybe ( String, Version ))
     | LoadedProject Project Solver.Config
     | PickedPackage String Version Solver.Config
+    | Solving Solver.State
     | Error String
     | Solution (List ( String, Version ))
 
@@ -61,12 +63,18 @@ type Msg
     | SwitchConnectivity
     | SwitchStrategy Solver.Strategy
     | Solve
+    | ApiMsg API.Msg
 
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    -- ( PickedPackage "mpizenberg/elm-pointer-events" Version.one defaultConfig, Cmd.none )
-    ( Model Solver.initCache (Init "" Nothing), Cmd.none )
+    ( { cache = Solver.initCache
+      , state = PickedPackage "elm/bytes" (Version.new_ 1 0 8) Solver.defaultConfig
+
+      -- , Init "" Nothing
+      }
+    , Cmd.none
+    )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -114,6 +122,9 @@ update msg model =
                 ( Solver.Finished (Err error), cmd ) ->
                     ( { model | state = Error error }, cmd )
 
+                ( solverState, cmd ) ->
+                    ( { model | state = Solving solverState }, cmd )
+
         -- Packages
         ( Input input, Init _ _ ) ->
             let
@@ -136,10 +147,25 @@ update msg model =
         ( Solve, PickedPackage package version config ) ->
             case Solver.solvePackage package version config model.cache of
                 ( Solver.Finished (Ok solution), cmd ) ->
-                    ( { model | state = Solution solution }, cmd )
+                    ( { model | state = Solution solution }, Cmd.map ApiMsg cmd )
 
                 ( Solver.Finished (Err error), cmd ) ->
-                    ( { model | state = Error error }, cmd )
+                    ( { model | state = Error error }, Cmd.map ApiMsg cmd )
+
+                ( solverState, cmd ) ->
+                    ( { model | state = Solving solverState }, Cmd.map ApiMsg cmd )
+
+        -- Solving
+        ( ApiMsg apiMsg, Solving solverState ) ->
+            case Solver.update apiMsg solverState of
+                ( Solver.Finished (Ok solution), _ ) ->
+                    ( { model | state = Solution solution }, Cmd.none )
+
+                ( Solver.Finished (Err error), _ ) ->
+                    ( { model | state = Error error }, Cmd.none )
+
+                ( newSolverState, cmd ) ->
+                    ( { model | state = Solving newSolverState }, Cmd.map ApiMsg cmd )
 
         _ ->
             ( model, Cmd.none )
@@ -166,6 +192,9 @@ viewElement model =
 
         LoadedProject project config ->
             viewProject config project
+
+        Solving solverState ->
+            viewSolving solverState
 
         Error error ->
             viewError error
@@ -383,6 +412,24 @@ viewApplication dependencies =
 viewDependency : ( String, Range ) -> Element msg
 viewDependency ( package, range ) =
     Element.text (package ++ " " ++ Range.toDebugString range)
+
+
+
+-- Solving
+
+
+viewSolving : Solver.State -> Element Msg
+viewSolving solverState =
+    Element.column
+        [ Element.centerX
+        , Element.spacing 20
+        , Element.width Element.shrink
+        ]
+        [ Element.row [ Element.width Element.fill ]
+            [ backToHomeButton, filler, cacheInfo ]
+        , Element.paragraph [ Element.Font.size 24 ]
+            [ Element.text "Solving ..." ]
+        ]
 
 
 
