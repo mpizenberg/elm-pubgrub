@@ -299,6 +299,13 @@ type alias PackagesConfig =
     }
 
 
+packagesConfigFromCache : Cache -> PackagesConfig
+packagesConfigFromCache cache =
+    { listAvailableVersions = \package -> Cache.listVersions package cache
+    , getDependencies = \package version -> Cache.listDependencies package version cache
+    }
+
+
 {-| PubGrub version solving algorithm.
 -}
 solve : PackagesConfig -> String -> Version -> Result String Solution
