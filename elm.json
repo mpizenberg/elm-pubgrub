@@ -5,22 +5,22 @@
     "license": "BSD-3-Clause",
     "version": "1.0.0",
     "exposed-modules": [
-        "Assignment",
-        "Incompatibility",
-        "Memory",
-        "PartialSolution",
         "PubGrub",
-        "PubGrubCore",
-        "Range",
-        "Report",
-        "Term",
-        "Version"
+        "PubGrub.Cache",
+        "PubGrub.Internal.Assignment",
+        "PubGrub.Internal.Core",
+        "PubGrub.Internal.Incompatibility",
+        "PubGrub.Internal.Memory",
+        "PubGrub.Internal.PartialSolution",
+        "PubGrub.Internal.Report",
+        "PubGrub.Internal.Term",
+        "PubGrub.Range",
+        "PubGrub.Version"
     ],
     "elm-version": "0.19.1 <= v < 0.20.0",
     "dependencies": {
         "elm/core": "1.0.5 <= v < 2.0.0",
         "elm/json": "1.1.3 <= v < 2.0.0",
-        "elm/project-metadata-utils": "1.0.1 <= v < 2.0.0",
         "pzp1997/assoc-list": "1.0.0 <= v < 2.0.0",
         "yotamDvir/elm-pivot": "3.1.0 <= v < 4.0.0"
     },

@@ -1,9 +1,8 @@
 module PubGrub exposing
     ( Solution
-    , PackagesConfig, solve
+    , PackagesConfig, solve, packagesConfigFromCache
     , State, stateToString, Effect(..), effectToString, Msg(..)
-    , Connectivity(..), init, update
-    , Cache, emptyCache, cacheDependencies, cachePackageVersions
+    , init, update
     )
 
 {-| PubGrub version solving algorithm.
@@ -43,10 +42,6 @@ with the following caracteristics, not only Elm packages.
       - stricly lower version (`foo 1.0.0 depends on bar < 2.0.0`)
       - ranges of versions (`foo 1.0.0 depends on bar 1.0.0 <= v < 2.0.0`)
 
-PS: at publication, only the `PubGrub`, `Version`, `Range`, and `Term`
-modules will be exposed.
-Others are exposed for easy docs usage at the moment.
-
 
 ## API
 
@@ -76,7 +71,7 @@ For this reason, it is possible to run the PubGrub algorithm step by step.
 Every time an effect may be required, it stops and informs the caller,
 which may resume the algorithm once necessary data is loaded.
 
-    PubGrub.update : Connectivity -> Cache -> Msg -> State -> ( State, Effect )
+    PubGrub.update : Cache -> Msg -> State -> ( State, Effect )
 
 The `Effect` type is public to enable the caller to perform
 the required task before resuming.
@@ -84,8 +79,7 @@ The `Msg` type is also public to drive the algorithm according
 to what was expected in the last effect when resuming.
 
 At any point between two `update` calls,
-the caller can change the `Connectivity`
-and update the `Cache` of already loaded data.
+the caller can update the `Cache` of already loaded data.
 
 The algorithm informs the caller that all is done
 when the `SignalEnd result` effect is emitted.
@@ -98,25 +92,23 @@ when the `SignalEnd result` effect is emitted.
 
 # Sync
 
-@docs PackagesConfig, solve
+@docs PackagesConfig, solve, packagesConfigFromCache
 
 
 # Async
 
 @docs State, stateToString, Effect, effectToString, Msg
-@docs Connectivity, init, update
-@docs Cache, emptyCache, cacheDependencies, cachePackageVersions
+@docs init, update
 
 -}
 
-import Array exposing (Array)
-import Dict exposing (Dict)
-import Incompatibility
-import PartialSolution
-import PubGrubCore
-import Range exposing (Range)
-import Term exposing (Term)
-import Version exposing (Version)
+import PubGrub.Cache as Cache exposing (Cache)
+import PubGrub.Internal.Core as Core
+import PubGrub.Internal.Incompatibility as Incompatibility
+import PubGrub.Internal.PartialSolution as PartialSolution
+import PubGrub.Internal.Term exposing (Term)
+import PubGrub.Range exposing (Range)
+import PubGrub.Version as Version exposing (Version)
 
 
 
@@ -126,12 +118,7 @@ import Version exposing (Version)
 {-| Internal state of the PubGrub algorithm.
 -}
 type State
-    = State { root : String, pgModel : PubGrubCore.Model }
-
-
-
--- { incompatibilities : List Incompatibility
--- , partialSolution : PartialSolution
+    = State { root : String, pgModel : Core.Model }
 
 
 {-| Convert a state into a printable string (for human reading).
@@ -212,11 +199,13 @@ effectToString effect =
                     "Solving terminated with an error"
 
 
+{-| Continue solving until the next `Effect` is required.
+-}
 updateEffect : Msg -> State -> ( State, Effect )
 updateEffect msg ((State { root, pgModel }) as state) =
     case msg of
         AvailableVersions package term versions ->
-            case PubGrubCore.pickVersion versions term of
+            case Core.pickVersion versions term of
                 Just version ->
                     ( state, RetrieveDependencies ( package, version ) )
 
@@ -226,9 +215,9 @@ updateEffect msg ((State { root, pgModel }) as state) =
                             Incompatibility.noVersion package term
 
                         updatedModel =
-                            PubGrubCore.mapIncompatibilities (Incompatibility.merge noVersionIncompat) pgModel
+                            Core.mapIncompatibilities (Incompatibility.merge noVersionIncompat) pgModel
                     in
-                    solveRec root package updatedModel
+                    solveStep root package updatedModel
 
         PackageDependencies package version maybeDependencies ->
             case maybeDependencies of
@@ -238,26 +227,32 @@ updateEffect msg ((State { root, pgModel }) as state) =
                             Incompatibility.unavailableDeps package version
 
                         updatedModel =
-                            PubGrubCore.mapIncompatibilities (Incompatibility.merge unavailableDepsIncompat) pgModel
+                            Core.mapIncompatibilities (Incompatibility.merge unavailableDepsIncompat) pgModel
                     in
-                    solveRec root package updatedModel
+                    solveStep root package updatedModel
 
                 Just deps ->
                     applyDecision deps package version pgModel
-                        |> solveRec root package
+                        |> solveStep root package
 
         NoMsg ->
             ( state, NoEffect )
 
 
-solveRec : String -> String -> PubGrubCore.Model -> ( State, Effect )
-solveRec root package pgModel =
-    case PubGrubCore.unitPropagation root package pgModel of
+{-| Advance the solver one step.
+
+It will either terminate (SignalEnd effect)
+or ask for the list of versions of a given package (ListVersions effect).
+
+-}
+solveStep : String -> String -> Core.Model -> ( State, Effect )
+solveStep root package pgModel =
+    case Core.unitPropagation root package pgModel of
         Err msg ->
             ( State { root = root, pgModel = pgModel }, SignalEnd (Err msg) )
 
         Ok updatedModel ->
-            case PubGrubCore.pickPackage updatedModel.partialSolution of
+            case Core.pickPackage updatedModel.partialSolution of
                 Nothing ->
                     case PartialSolution.solution updatedModel.partialSolution of
                         Just solution ->
@@ -272,7 +267,10 @@ solveRec root package pgModel =
                     ( State { root = root, pgModel = updatedModel }, ListVersions packageAndTerm )
 
 
-applyDecision : List ( String, Range ) -> String -> Version -> PubGrubCore.Model -> PubGrubCore.Model
+{-| Update the model incompatibilities and partial solution
+with the package version we've just picked and its dependencies.
+-}
+applyDecision : List ( String, Range ) -> String -> Version -> Core.Model -> Core.Model
 applyDecision dependencies package version pgModel =
     let
         depIncompats =
@@ -290,10 +288,10 @@ applyDecision dependencies package version pgModel =
     in
     case PartialSolution.addVersion package version depIncompats pgModel.partialSolution of
         Nothing ->
-            PubGrubCore.setIncompatibilities updatedIncompatibilities pgModel
+            Core.setIncompatibilities updatedIncompatibilities pgModel
 
         Just updatedPartial ->
-            PubGrubCore.Model updatedIncompatibilities updatedPartial
+            Core.Model updatedIncompatibilities updatedPartial
 
 
 
@@ -301,6 +299,8 @@ applyDecision dependencies package version pgModel =
 
 
 {-| Configuration of available packages to solve dependencies.
+The strategy of which version should be preferably picked in the list of available versions
+is implied by the order of the list: first version in the list will be tried first.
 -}
 type alias PackagesConfig =
     { listAvailableVersions : String -> List Version
@@ -308,14 +308,33 @@ type alias PackagesConfig =
     }
 
 
+{-| Convenient conversion of a cache into available packages configuration.
+This is basically:
+
+    packagesConfigFromCache cache =
+        { listAvailableVersions = Cache.listVersions cache
+        , getDependencies = Cache.listDependencies cache
+        }
+
+-}
+packagesConfigFromCache : Cache -> PackagesConfig
+packagesConfigFromCache cache =
+    { listAvailableVersions = Cache.listVersions cache
+    , getDependencies = Cache.listDependencies cache
+    }
+
+
 {-| PubGrub version solving algorithm.
 -}
 solve : PackagesConfig -> String -> Version -> Result String Solution
 solve config root version =
-    solveRec root root (PubGrubCore.init root version)
+    solveStep root root (Core.init root version)
         |> updateUntilFinished config
 
 
+{-| Recursively call updateEffect until the `SignalEnd` effect is emitted
+and a result can be returned.
+-}
 updateUntilFinished : PackagesConfig -> ( State, Effect ) -> Result String Solution
 updateUntilFinished config ( state, effect ) =
     case effect of
@@ -326,6 +345,8 @@ updateUntilFinished config ( state, effect ) =
             updateUntilFinished config (updateEffect (performSync config effect) state)
 
 
+{-| Convert an effect directly into a message according to the configuration.
+-}
 performSync : PackagesConfig -> Effect -> Msg
 performSync config effect =
     case effect of
@@ -348,151 +369,48 @@ performSync config effect =
 -- ASYNC #############################################################
 
 
-{-| Online or Offline.
-
-In Offline mode, the `ListVersions` effect is never emitted
-because we never know if a new version or not may be available,
-and thus if the cache contains or not all available versions.
-It will always use the list of versions available in cache.
-
-In Offline mode, the `RetrieveDependencies` effect is never emitted.
-Either the dependencies are known and it will continue,
-or they aren't and it will signal a failure.
-
--}
-type Connectivity
-    = Online
-    | Offline
-
-
 {-| Initialize PubGrub algorithm.
 -}
-init : Connectivity -> Cache -> String -> Version -> ( State, Effect )
-init connectivity cache root version =
-    solveRec root root (PubGrubCore.init root version)
-        |> tryUpdateCached connectivity cache
+init : Cache -> String -> Version -> ( State, Effect )
+init cache root version =
+    solveStep root root (Core.init root version)
+        |> tryUpdateCached cache
 
 
 {-| Update the state of the PubGrub algorithm.
+
+For messages of the `AvailableVersions` variant,
+it is the caller responsability to order the versions in the list
+with preferred versions at the beginning of the list.
+As such, it is easy to try to pick the newest versions compatible
+by ordering the versions with a decreasing order.
+Alternatively, it can also be interesting to find the minimal versions
+(oldest) in order to verify that the tests pass with those.
+
 -}
-update : Connectivity -> Cache -> Msg -> State -> ( State, Effect )
-update connectivity cache msg state =
+update : Cache -> Msg -> State -> ( State, Effect )
+update cache msg state =
     updateEffect msg state
-        |> tryUpdateCached connectivity cache
+        |> tryUpdateCached cache
 
 
-tryUpdateCached : Connectivity -> Cache -> ( State, Effect ) -> ( State, Effect )
-tryUpdateCached connectivity (Cache cache) stateAndEffect =
+{-| If the provided effect is `RetrieveDependencies`,
+try to look for that package in the cache.
+If it is present, progress and repeat.
+Otherwise, just emit the effect.
+-}
+tryUpdateCached : Cache -> ( State, Effect ) -> ( State, Effect )
+tryUpdateCached cache stateAndEffect =
     case stateAndEffect of
-        ( _, NoEffect ) ->
-            stateAndEffect
-
-        ( _, SignalEnd _ ) ->
-            stateAndEffect
-
-        ( state, ListVersions ( package, term ) ) ->
-            case connectivity of
-                Online ->
-                    stateAndEffect
-
-                Offline ->
-                    let
-                        versions =
-                            Dict.get package cache.packages
-                                |> Maybe.withDefault []
-
-                        msg =
-                            AvailableVersions package term versions
-                    in
-                    update connectivity (Cache cache) msg state
-
-        ( (State { root, pgModel }) as state, RetrieveDependencies ( package, version ) ) ->
-            case Dict.get ( package, Version.toTuple version ) cache.dependencies of
-                Nothing ->
-                    case connectivity of
-                        Online ->
-                            stateAndEffect
-
-                        Offline ->
-                            let
-                                msg =
-                                    PackageDependencies package version Nothing
-                            in
-                            update connectivity (Cache cache) msg state
-
+        ( State { root, pgModel }, RetrieveDependencies ( package, version ) ) ->
+            case Cache.listDependencies cache package version of
                 Just deps ->
                     applyDecision deps package version pgModel
-                        |> solveRec root package
-                        |> tryUpdateCached connectivity (Cache cache)
+                        |> solveStep root package
+                        |> tryUpdateCached cache
 
+                Nothing ->
+                    stateAndEffect
 
-
--- Cache
-
-
-{-| Cache holding already loaded packages information.
--}
-type Cache
-    = Cache
-        { packagesRaw : Array ( String, Version )
-        , packages : Dict String (List Version)
-        , dependencies : Dict ( String, ( Int, Int, Int ) ) (List ( String, Range ))
-        }
-
-
-{-| Initial empty cache.
--}
-emptyCache : Cache
-emptyCache =
-    Cache
-        { packagesRaw = Array.empty
-        , packages = Dict.empty
-        , dependencies = Dict.empty
-        }
-
-
-{-| Add dependencies of a package to the cache.
--}
-cacheDependencies : String -> Version -> List ( String, Range ) -> Cache -> Cache
-cacheDependencies package version deps (Cache cache) =
-    if Dict.member ( package, Version.toTuple version ) cache.dependencies then
-        Cache cache
-
-    else
-        Cache { cache | dependencies = Dict.insert ( package, Version.toTuple version ) deps cache.dependencies }
-
-
-{-| Add a list of packages and versions to the cache.
--}
-cachePackageVersions : List ( String, Version ) -> Cache -> Cache
-cachePackageVersions packagesVersions (Cache { packagesRaw, packages, dependencies }) =
-    let
-        ( updatedRaw, updatePackages ) =
-            List.foldl addPackageVersion ( packagesRaw, packages ) packagesVersions
-    in
-    Cache
-        { packagesRaw = updatedRaw
-        , packages = updatePackages
-        , dependencies = dependencies
-        }
-
-
-addPackageVersion :
-    ( String, Version )
-    -> ( Array ( String, Version ), Dict String (List Version) )
-    -> ( Array ( String, Version ), Dict String (List Version) )
-addPackageVersion ( package, version ) ( raw, packages ) =
-    case Dict.get package packages of
-        Nothing ->
-            ( Array.push ( package, version ) raw
-            , Dict.insert package [ version ] packages
-            )
-
-        Just versions ->
-            if List.member version versions then
-                ( raw, packages )
-
-            else
-                ( Array.push ( package, version ) raw
-                , Dict.update package (Maybe.map ((::) version)) packages
-                )
+        _ ->
+            stateAndEffect

@@ -1,4 +1,4 @@
-module PartialSolution exposing
+module PubGrub.Internal.PartialSolution exposing
     ( PartialSolution, empty, toDebugString
     , solution
     , prependDecision, prependDerivation, backtrack
@@ -33,14 +33,14 @@ This module provides functions to manage it.
 
 -}
 
-import Assignment exposing (Assignment)
 import Dict exposing (Dict)
-import Incompatibility exposing (Incompatibility, Relation)
 import Json.Encode exposing (Value)
-import Memory exposing (Memory)
-import Term exposing (Term)
+import PubGrub.Internal.Assignment as Assignment exposing (Assignment)
+import PubGrub.Internal.Incompatibility as Incompatibility exposing (Incompatibility, Relation)
+import PubGrub.Internal.Memory as Memory exposing (Memory)
+import PubGrub.Internal.Term as Term exposing (Term)
+import PubGrub.Version as Version exposing (Version)
 import Utils exposing (SearchDecision(..))
-import Version exposing (Version)
 
 
 {-| The partial solution is the current state of our solution.

@@ -1,19 +1,48 @@
-module Database.History exposing (allPackages)
+module ElmPackages exposing
+    ( allPackages
+    , packageVersionFromString
+    )
 
 {-| Pre-loaded history of all elm package versions.
 NOT USED YET, I'm still in the debugging phase,
 with handcrafted examples in Database.Stub.
-
-@docs allPackages
-
 -}
 
 import Dict exposing (Dict)
 import Elm.Version exposing (Version)
 import Json.Decode exposing (Decoder)
+import Json.Encode
 
 
-{-| List of all packages exisiting to this moment.
+{-| Convert a string of the form: "user/package@version"
+into a string package "user/package" and a Version.
+
+Fail with an error message if the string is not valid.
+
+-}
+packageVersionFromString : String -> Result String ( String, Version )
+packageVersionFromString str =
+    case String.split "@" str of
+        package :: version :: [] ->
+            case Json.Decode.decodeValue Elm.Version.decoder (Json.Encode.string version) of
+                Ok elmVersion ->
+                    Ok ( package, elmVersion )
+
+                Err err ->
+                    Err (Json.Decode.errorToString err)
+
+        _ ->
+            Err ("Invalid package and version format: " ++ str)
+
+
+
+-- Preloaded history
+
+
+{-| List of all packages exisiting the last time the following command was used:
+
+    curl -L https://package.elm-lang.org/all-packages | jq . > history.json
+
 -}
 allPackages : Dict String (List Version)
 allPackages =
@@ -380,7 +409,9 @@ raw =
     "2.1.0",
     "2.2.0",
     "2.3.0",
-    "2.4.0"
+    "2.4.0",
+    "2.4.1",
+    "2.4.2"
   ],
   "Chadtech/elm-css-grid": [
     "1.0.0",
@@ -409,7 +440,11 @@ raw =
     "2.0.1",
     "2.0.2",
     "2.0.3",
-    "2.0.4"
+    "2.0.4",
+    "3.0.0",
+    "3.0.1",
+    "4.0.0",
+    "4.0.1"
   ],
   "Chadtech/elm-provider": [
     "1.0.0",
@@ -525,6 +560,10 @@ raw =
     "2.0.1",
     "2.0.2"
   ],
+  "CipherDogs/elm-bitcoin": [
+    "1.0.0",
+    "2.0.0"
+  ],
   "CoderDennis/elm-time-format": [
     "1.0.0"
   ],
@@ -532,6 +571,16 @@ raw =
     "1.0.0",
     "1.0.1",
     "1.1.0"
+  ],
+  "Confidenceman02/elm-animate-height": [
+    "1.0.0",
+    "1.0.1",
+    "1.0.2",
+    "1.0.3",
+    "1.0.4",
+    "2.0.0",
+    "2.0.1",
+    "2.0.2"
   ],
   "ContaSystemer/elm-menu": [
     "1.0.0",
@@ -597,10 +646,27 @@ raw =
   ],
   "EngageSoftware/elm-dnn-http": [
     "1.0.0",
-    "2.0.0"
+    "2.0.0",
+    "2.1.0"
   ],
   "EngageSoftware/elm-dnn-localization": [
     "1.0.2"
+  ],
+  "EngageSoftware/elm-engage-common": [
+    "1.0.0",
+    "1.0.1",
+    "1.1.0",
+    "1.1.1",
+    "2.0.0",
+    "2.0.1",
+    "3.0.0",
+    "3.1.0",
+    "4.0.0",
+    "5.0.0",
+    "5.0.1"
+  ],
+  "EngageSoftware/elm-mustache": [
+    "1.0.0"
   ],
   "FMFI-UK-1-AIN-412/elm-formula": [
     "1.0.0",
@@ -621,7 +687,8 @@ raw =
     "2.0.0",
     "3.0.0",
     "3.1.0",
-    "3.1.1"
+    "3.1.1",
+    "3.2.0"
   ],
   "FabienHenon/elm-infinite-scroll": [
     "1.0.0",
@@ -636,7 +703,8 @@ raw =
     "2.4.1",
     "3.0.0",
     "3.0.1",
-    "3.0.2"
+    "3.0.2",
+    "3.0.3"
   ],
   "FabienHenon/elm-iso8601-date-strings": [
     "1.0.0"
@@ -659,14 +727,19 @@ raw =
     "1.2.1",
     "2.0.0",
     "2.0.1",
-    "2.0.2"
+    "2.0.2",
+    "2.1.0",
+    "2.2.0",
+    "2.3.0"
   ],
   "FabienHenon/remote-resource": [
     "1.0.0"
   ],
   "FordLabs/elm-star-rating": [
     "1.0.0",
-    "1.0.1"
+    "1.0.1",
+    "1.1.0",
+    "1.2.0"
   ],
   "FranklinChen/elm-tau": [
     "1.0.0"
@@ -824,14 +897,16 @@ raw =
     "1.0.0",
     "2.0.0",
     "3.0.0",
-    "3.0.1"
+    "3.0.1",
+    "3.1.0"
   ],
   "GlobalWebIndex/cmd-extra": [
     "1.0.0",
     "1.1.0",
     "1.1.1",
     "1.1.2",
-    "1.2.0"
+    "1.2.0",
+    "1.3.0"
   ],
   "GlobalWebIndex/elm-plural-rules": [
     "1.0.0",
@@ -873,7 +948,8 @@ raw =
     "1.1.0",
     "1.1.1",
     "1.2.0",
-    "1.2.1"
+    "1.2.1",
+    "1.2.2"
   ],
   "Herteby/url-builder-plus": [
     "1.0.0",
@@ -910,6 +986,15 @@ raw =
     "3.0.1",
     "4.0.0",
     "4.0.1"
+  ],
+  "IzumiSy/elm-multi-waitable": [
+    "1.0.0",
+    "1.0.1",
+    "1.0.2",
+    "1.0.3",
+    "1.1.0",
+    "1.1.1",
+    "1.1.2"
   ],
   "Janiczek/architecture-test": [
     "1.0.0",
@@ -1030,7 +1115,8 @@ raw =
   "JohnBugner/elm-bag": [
     "1.0.0",
     "1.0.1",
-    "2.0.0"
+    "2.0.0",
+    "2.0.1"
   ],
   "JohnBugner/elm-loop": [
     "1.0.0",
@@ -1038,6 +1124,9 @@ raw =
     "2.0.1",
     "2.0.2",
     "2.1.0"
+  ],
+  "JohnBugner/elm-matrix": [
+    "1.0.0"
   ],
   "JonRowe/elm-jwt": [
     "1.0.0"
@@ -1070,7 +1159,8 @@ raw =
     "2.0.0",
     "2.0.1",
     "2.0.2",
-    "2.0.3"
+    "2.0.3",
+    "2.1.0"
   ],
   "JulianKniephoff/elm-time-extra": [
     "1.0.0"
@@ -1086,7 +1176,9 @@ raw =
     "4.2.0",
     "4.3.0",
     "5.0.0",
-    "5.0.1"
+    "5.0.1",
+    "6.0.0",
+    "6.1.0"
   ],
   "JustusAdam/elm-path": [
     "1.0.0",
@@ -1097,6 +1189,9 @@ raw =
     "1.2.3",
     "1.2.4",
     "1.3.0"
+  ],
+  "K-Adam/elm-dom": [
+    "1.0.0"
   ],
   "Kinto/elm-kinto": [
     "1.0.0",
@@ -1212,17 +1307,21 @@ raw =
     "2.2.1",
     "2.2.2",
     "3.0.0",
-    "3.0.1"
+    "3.0.1",
+    "3.0.2",
+    "3.0.3"
   ],
   "MartinSStewart/elm-bayer-matrix": [
     "1.0.0"
   ],
   "MartinSStewart/elm-box-packing": [
-    "1.0.0"
+    "1.0.0",
+    "1.0.1"
   ],
   "MartinSStewart/elm-codec-bytes": [
     "1.0.0",
-    "1.1.0"
+    "1.1.0",
+    "1.1.1"
   ],
   "MartinSStewart/elm-nonempty-string": [
     "1.0.0",
@@ -1243,12 +1342,18 @@ raw =
     "1.1.0",
     "1.1.1"
   ],
+  "MaybeJustJames/yaml": [
+    "1.0.0"
+  ],
   "MazeChaZer/elm-ckeditor": [
     "1.0.0"
   ],
   "MichaelCombs28/elm-base85": [
     "1.0.0",
     "1.0.1"
+  ],
+  "MichaelCombs28/elm-css-bulma": [
+    "1.0.0"
   ],
   "MichaelCombs28/elm-dom": [
     "1.0.0"
@@ -1274,7 +1379,10 @@ raw =
     "1.1.0"
   ],
   "Morgan-Stanley/morphir-elm": [
-    "1.0.0"
+    "1.0.0",
+    "1.1.0",
+    "2.0.0",
+    "2.1.0"
   ],
   "Natim/elm-workalendar": [
     "1.0.0",
@@ -1671,7 +1779,27 @@ raw =
     "8.1.0",
     "8.2.0",
     "8.3.0",
-    "8.3.1"
+    "8.3.1",
+    "9.0.0",
+    "9.1.0",
+    "9.2.0",
+    "9.3.0",
+    "9.4.0",
+    "9.5.0",
+    "9.5.1",
+    "9.0.1",
+    "9.6.0",
+    "9.5.2",
+    "9.0.2",
+    "9.7.0",
+    "9.8.0",
+    "9.8.1",
+    "9.9.0",
+    "10.0.0",
+    "10.1.0",
+    "10.2.0",
+    "10.3.0",
+    "10.4.0"
   ],
   "NoRedInk/nri-elm-css": [
     "1.0.0",
@@ -1768,7 +1896,12 @@ raw =
     "1.6.1"
   ],
   "Orasund/elm-ui-widgets": [
-    "1.0.0"
+    "1.0.0",
+    "2.0.0",
+    "2.0.1",
+    "2.0.2",
+    "2.0.3",
+    "2.0.4"
   ],
   "Orasund/pixelengine": [
     "1.0.0",
@@ -1830,6 +1963,9 @@ raw =
   "PaackEng/elm-ui-dropdown": [
     "1.0.0",
     "1.1.0"
+  ],
+  "PaackEng/paack-ui": [
+    "1.0.0"
   ],
   "PanagiotisGeorgiadis/elm-datepicker": [
     "1.0.0",
@@ -1916,7 +2052,16 @@ raw =
     "21.0.0",
     "21.0.1",
     "22.0.0",
-    "22.0.1"
+    "22.0.1",
+    "23.0.0",
+    "24.0.0",
+    "25.0.0",
+    "25.0.1",
+    "25.1.0",
+    "25.2.0",
+    "25.2.1",
+    "26.0.0",
+    "27.0.0"
   ],
   "RGBboy/websocket-server": [
     "1.0.0",
@@ -1992,7 +2137,8 @@ raw =
     "1.0.1"
   ],
   "SiriusStarr/elm-spaced-repetition": [
-    "1.0.0"
+    "1.0.0",
+    "1.1.0"
   ],
   "SiriusStarr/elm-splat": [
     "1.0.0"
@@ -2051,7 +2197,27 @@ raw =
     "2.0.22",
     "2.0.23",
     "2.0.24",
-    "2.0.25"
+    "2.0.25",
+    "2.0.26",
+    "2.0.27",
+    "2.0.28"
+  ],
+  "Skinney/elm-warrior": [
+    "1.0.0",
+    "1.1.0",
+    "1.2.0",
+    "2.0.0",
+    "2.1.0",
+    "3.0.0",
+    "3.1.0",
+    "3.1.1",
+    "3.1.2",
+    "4.0.0",
+    "4.0.1",
+    "4.0.2",
+    "4.0.3",
+    "4.0.4",
+    "4.0.5"
   ],
   "Skinney/fnv": [
     "1.0.0",
@@ -2144,7 +2310,8 @@ raw =
     "1.0.0",
     "2.0.0",
     "2.1.0",
-    "2.1.1"
+    "2.1.1",
+    "2.1.2"
   ],
   "TSFoster/elm-md5": [
     "1.0.0",
@@ -2161,7 +2328,8 @@ raw =
     "1.0.5",
     "1.1.0",
     "2.0.0",
-    "2.1.0"
+    "2.1.0",
+    "2.1.1"
   ],
   "TSFoster/elm-tuple-extra": [
     "1.0.0",
@@ -2177,7 +2345,10 @@ raw =
     "2.2.1",
     "2.2.2",
     "3.0.0",
-    "3.0.1"
+    "3.0.1",
+    "3.1.0",
+    "4.0.0",
+    "4.0.1"
   ],
   "TheDahv/doctari": [
     "1.0.0"
@@ -2325,7 +2496,8 @@ raw =
     "2.0.2",
     "3.0.0",
     "3.0.1",
-    "3.0.2"
+    "3.0.2",
+    "3.1.0"
   ],
   "Warry/elmi-decoder": [
     "1.0.0",
@@ -2503,12 +2675,14 @@ raw =
     "5.2.0",
     "5.2.1",
     "5.2.2",
-    "5.2.3"
+    "5.2.3",
+    "5.2.4"
   ],
   "abadi199/intl-phone-input": [
     "1.0.0",
     "2.0.0",
-    "2.0.1"
+    "2.0.1",
+    "2.0.2"
   ],
   "abinayasudhir/elm-select": [
     "1.0.0",
@@ -2528,6 +2702,9 @@ raw =
     "1.0.3"
   ],
   "abinayasudhir/outmessage": [
+    "1.0.0"
+  ],
+  "abradley2/elm-calendar": [
     "1.0.0"
   ],
   "abradley2/elm-datepicker": [
@@ -2616,7 +2793,12 @@ raw =
     "2.0.1",
     "2.1.0",
     "2.1.1",
-    "2.1.2"
+    "2.1.2",
+    "3.0.0",
+    "3.0.1",
+    "3.0.2",
+    "3.0.3",
+    "4.0.0"
   ],
   "agrafix/elm-bootforms": [
     "1.0.0",
@@ -2638,12 +2820,16 @@ raw =
   "agustinrhcp/elm-datepicker": [
     "1.0.0"
   ],
+  "agustinrhcp/elm-mask": [
+    "1.0.0"
+  ],
   "ahstro/elm-bulma-classes": [
     "1.0.0",
     "2.0.0",
     "2.1.0",
     "3.0.0",
-    "3.1.0"
+    "3.1.0",
+    "4.0.0"
   ],
   "ahstro/elm-konami-code": [
     "1.0.0"
@@ -2716,7 +2902,8 @@ raw =
     "1.0.0",
     "2.0.0",
     "2.0.1",
-    "2.1.0"
+    "2.1.0",
+    "2.1.1"
   ],
   "alex-tan/postgrest-queries": [
     "1.0.0",
@@ -2737,7 +2924,8 @@ raw =
     "7.2.0"
   ],
   "alex-tan/task-extra": [
-    "1.0.0"
+    "1.0.0",
+    "1.1.0"
   ],
   "alexanderkiel/elm-mdc-alpha": [
     "1.0.0",
@@ -2978,7 +3166,8 @@ raw =
     "4.0.1",
     "4.0.2",
     "5.0.0",
-    "6.0.0"
+    "6.0.0",
+    "6.0.1"
   ],
   "antivanov/eunit": [
     "1.0.0"
@@ -3062,7 +3251,8 @@ raw =
     "1.0.4",
     "1.1.0",
     "1.1.1",
-    "1.2.0"
+    "1.2.0",
+    "1.3.0"
   ],
   "arowM/elm-form-validator": [
     "1.0.0",
@@ -3315,7 +3505,8 @@ raw =
     "2.3.2",
     "3.0.0",
     "3.1.0",
-    "3.2.0"
+    "3.2.0",
+    "3.3.0"
   ],
   "avh4/elm-spec": [
     "1.0.0",
@@ -3671,7 +3862,23 @@ raw =
   ],
   "billstclair/elm-mastodon": [
     "1.0.0",
-    "2.0.0"
+    "2.0.0",
+    "3.0.0",
+    "3.0.1",
+    "4.0.0",
+    "4.0.1",
+    "4.0.2",
+    "5.0.0",
+    "5.0.1",
+    "6.0.0",
+    "6.0.1",
+    "6.0.2",
+    "6.0.3",
+    "7.0.0",
+    "8.0.0",
+    "9.0.0",
+    "9.0.1",
+    "9.0.2"
   ],
   "billstclair/elm-mastodon-websocket": [
     "1.0.0"
@@ -3683,6 +3890,11 @@ raw =
     "2.0.0",
     "2.0.1",
     "3.0.0"
+  ],
+  "billstclair/elm-popup-picker": [
+    "1.0.0",
+    "1.0.1",
+    "1.1.0"
   ],
   "billstclair/elm-port-funnel": [
     "1.0.0",
@@ -3743,7 +3955,8 @@ raw =
     "1.2.0",
     "2.0.0",
     "3.0.0",
-    "3.1.0"
+    "3.1.0",
+    "4.0.0"
   ],
   "billstclair/elm-system-notification": [
     "1.0.0",
@@ -4011,7 +4224,9 @@ raw =
     "1.1.0",
     "2.0.0",
     "2.1.0",
-    "2.2.0"
+    "2.2.0",
+    "3.0.0",
+    "3.0.1"
   ],
   "brianvanburken/elm-list-date": [
     "1.0.0",
@@ -4060,10 +4275,13 @@ raw =
   "calions-app/jsonapi-http": [
     "1.0.0",
     "1.0.1",
-    "1.1.0"
+    "1.1.0",
+    "1.2.0",
+    "1.3.0"
   ],
   "calions-app/jsonapi-http-retry": [
-    "1.0.0"
+    "1.0.0",
+    "2.0.0"
   ],
   "calions-app/remote-resource": [
     "1.0.0"
@@ -4106,7 +4324,8 @@ raw =
     "1.0.0",
     "1.0.1",
     "2.0.0",
-    "2.1.0"
+    "2.1.0",
+    "2.1.1"
   ],
   "cappyzawa/elm-ui-onedark": [
     "1.0.0",
@@ -4197,7 +4416,12 @@ raw =
     "10.0.0",
     "11.0.0",
     "11.1.0",
-    "11.1.1"
+    "11.1.1",
+    "11.1.2",
+    "11.1.3",
+    "11.1.4",
+    "11.1.5",
+    "11.1.6"
   ],
   "carwow/elm-slider-old": [
     "1.0.0",
@@ -4313,9 +4537,21 @@ raw =
   "cedricss/elm-form-machine": [
     "1.0.0"
   ],
+  "cedricss/elm-progress-ring": [
+    "1.0.0",
+    "1.0.1"
+  ],
   "chain-partners/elm-bignum": [
     "1.0.0",
     "1.0.1"
+  ],
+  "chazsconi/elm-phoenix-ports": [
+    "1.0.0",
+    "1.1.0",
+    "1.1.1"
+  ],
+  "chemirea/bulma-classes": [
+    "1.0.0"
   ],
   "chendrix/elm-matrix": [
     "1.0.0",
@@ -4719,7 +4955,8 @@ raw =
     "7.0.0",
     "8.0.0",
     "8.1.0",
-    "8.1.1"
+    "8.1.1",
+    "8.1.2"
   ],
   "cultureamp/babel-elm-assets-plugin": [
     "1.0.0",
@@ -4817,6 +5054,11 @@ raw =
   ],
   "danhandrea/elm-foo": [
     "1.0.0"
+  ],
+  "danhandrea/elm-router": [
+    "1.0.0",
+    "1.0.1",
+    "1.0.2"
   ],
   "danielnarey/elm-color-math": [
     "1.0.0",
@@ -5053,7 +5295,8 @@ raw =
     "6.0.0"
   ],
   "declension/elm-obj-loader": [
-    "1.0.0"
+    "1.0.0",
+    "1.0.1"
   ],
   "derekdreery/elm-die-faces": [
     "1.0.0"
@@ -5126,13 +5369,19 @@ raw =
     "3.0.1",
     "3.0.2",
     "4.0.0",
-    "4.0.1"
+    "4.0.1",
+    "5.0.0",
+    "5.0.1",
+    "5.0.2",
+    "6.0.0"
   ],
   "dillonkearns/elm-rss": [
-    "1.0.0"
+    "1.0.0",
+    "1.0.1"
   ],
   "dillonkearns/elm-sitemap": [
-    "1.0.0"
+    "1.0.0",
+    "1.0.1"
   ],
   "dillonkearns/graphqelm": [
     "1.0.0",
@@ -5260,7 +5509,8 @@ raw =
     "2.2.1",
     "2.3.0",
     "3.0.0",
-    "3.1.0"
+    "3.1.0",
+    "4.0.0"
   ],
   "driebit/elm-html-unsafe-headers": [
     "1.0.0",
@@ -5283,6 +5533,11 @@ raw =
     "1.0.0",
     "1.0.1",
     "1.0.2"
+  ],
+  "dullbananas/elm-touch": [
+    "1.0.0",
+    "1.1.0",
+    "1.2.0"
   ],
   "duncanmalashock/json-rest-api": [
     "1.0.0",
@@ -5652,7 +5907,9 @@ raw =
     "1.0.1",
     "1.0.2",
     "2.0.0",
-    "2.1.0"
+    "2.1.0",
+    "2.2.0",
+    "2.3.0"
   ],
   "elm-community/basics-extra": [
     "1.0.0",
@@ -5866,7 +6123,8 @@ raw =
     "3.0.0",
     "4.0.0",
     "4.1.0",
-    "4.2.0"
+    "4.2.0",
+    "4.3.0"
   ],
   "elm-community/lazy-list": [
     "1.0.0"
@@ -6139,7 +6397,8 @@ raw =
     "1.0.1"
   ],
   "elm-scotland/elm-tries": [
-    "1.0.0"
+    "1.0.0",
+    "1.0.1"
   ],
   "elm-tools/documentation": [
     "1.0.0",
@@ -6528,10 +6787,17 @@ raw =
     "1.0.0"
   ],
   "f0i/iso8601": [
-    "1.0.0"
+    "1.0.0",
+    "1.1.0",
+    "1.1.1"
+  ],
+  "f0i/statistics": [
+    "1.0.0",
+    "2.0.0"
   ],
   "fabhof/elm-ui-datepicker": [
-    "1.0.0"
+    "1.0.0",
+    "2.0.0"
   ],
   "fabiommendes/elm-bricks": [
     "1.0.0",
@@ -6590,7 +6856,8 @@ raw =
     "1.2.1",
     "1.2.2",
     "1.3.0",
-    "1.4.0"
+    "1.4.0",
+    "1.5.0"
   ],
   "fedragon/elm-typed-dropdown": [
     "1.0.0",
@@ -6651,6 +6918,9 @@ raw =
     "1.0.2",
     "1.0.3",
     "1.0.4"
+  ],
+  "folkertdev/elm-cff": [
+    "1.0.0"
   ],
   "folkertdev/elm-deque": [
     "1.0.0",
@@ -6734,12 +7004,15 @@ raw =
     "1.0.0",
     "1.0.1",
     "2.0.0",
-    "3.0.0"
+    "3.0.0",
+    "4.0.0"
   ],
   "folq/review-rgb-ranges": [
     "1.0.0",
     "1.0.1",
-    "1.0.2"
+    "1.0.2",
+    "1.0.3",
+    "1.0.4"
   ],
   "francescortiz/elm-queue": [
     "1.0.0"
@@ -6793,6 +7066,9 @@ raw =
     "1.0.0",
     "1.0.1"
   ],
+  "gampleman/elm-examples-helper": [
+    "1.0.0"
+  ],
   "gampleman/elm-mapbox": [
     "1.0.0",
     "2.0.0",
@@ -6825,6 +7101,12 @@ raw =
   ],
   "gdamjan/elm-identicon": [
     "1.0.0"
+  ],
+  "gege251/elm-validator-pipeline": [
+    "1.0.0",
+    "1.1.0",
+    "1.1.1",
+    "2.0.0"
   ],
   "genthaler/elm-enum": [
     "1.0.0",
@@ -6968,7 +7250,8 @@ raw =
     "5.1.0",
     "5.2.0",
     "5.3.0",
-    "5.4.0"
+    "5.4.0",
+    "5.5.0"
   ],
   "gicentre/elm-vegalite": [
     "1.0.0",
@@ -7022,7 +7305,15 @@ raw =
     "2.1.0",
     "2.1.1",
     "2.2.0",
-    "2.2.1"
+    "2.2.1",
+    "2.3.0"
+  ],
+  "gipsy-king/radar-chart": [
+    "1.0.0",
+    "1.0.1",
+    "2.0.0",
+    "3.0.0",
+    "3.0.1"
   ],
   "glasserc/elm-debouncer": [
     "1.0.0"
@@ -7081,6 +7372,9 @@ raw =
   "groteck/elm-iban": [
     "1.0.0",
     "1.1.0"
+  ],
+  "grotsev/elm-debouncer": [
+    "1.0.0"
   ],
   "grrinchas/elm-graphql-client": [
     "1.0.0",
@@ -7251,6 +7545,10 @@ raw =
     "1.0.0",
     "1.0.2"
   ],
+  "hmsk/elm-css-modern-normalize": [
+    "1.0.0",
+    "1.0.1"
+  ],
   "hoelzro/elm-drag": [
     "1.0.0",
     "1.0.1",
@@ -7311,7 +7609,12 @@ raw =
     "2.0.0",
     "2.0.1",
     "2.0.2",
-    "3.0.0"
+    "3.0.0",
+    "3.1.0"
+  ],
+  "ianmackenzie/elm-3d-scene": [
+    "1.0.0",
+    "1.0.1"
   ],
   "ianmackenzie/elm-float-extra": [
     "1.0.0",
@@ -7330,7 +7633,9 @@ raw =
     "3.1.0",
     "3.2.0",
     "3.3.0",
-    "3.4.0"
+    "3.4.0",
+    "3.5.0",
+    "3.6.0"
   ],
   "ianmackenzie/elm-geometry-linear-algebra-interop": [
     "1.0.0",
@@ -7357,7 +7662,9 @@ raw =
   "ianmackenzie/elm-interval": [
     "1.0.0",
     "1.0.1",
-    "2.0.0"
+    "2.0.0",
+    "3.0.0",
+    "3.0.1"
   ],
   "ianmackenzie/elm-iso-10303": [
     "1.0.0"
@@ -7382,7 +7689,9 @@ raw =
     "2.2.0",
     "2.3.0",
     "2.4.0",
-    "2.5.0"
+    "2.5.0",
+    "2.5.1",
+    "2.6.0"
   ],
   "ianmackenzie/elm-units-interval": [
     "1.0.0",
@@ -7542,7 +7851,8 @@ raw =
   ],
   "insurello/elm-ui-explorer": [
     "1.0.0",
-    "1.1.0"
+    "1.1.0",
+    "1.1.1"
   ],
   "iodevs/elm-history": [
     "1.0.0"
@@ -7719,7 +8029,9 @@ raw =
     "1.0.2",
     "1.0.3",
     "1.1.0",
-    "1.2.0"
+    "1.2.0",
+    "2.0.0",
+    "2.1.0"
   ],
   "jasonmahr/html-escape-sequences": [
     "1.0.0",
@@ -7814,7 +8126,11 @@ raw =
   "jfmengels/elm-review": [
     "1.0.0",
     "2.0.0",
-    "2.0.1"
+    "2.0.1",
+    "2.0.2",
+    "2.1.0",
+    "2.1.1",
+    "2.2.0"
   ],
   "jfmengels/elm-review-reporter": [
     "1.0.0"
@@ -7829,12 +8145,23 @@ raw =
     "1.0.2"
   ],
   "jfmengels/review-common": [
-    "1.0.0"
+    "1.0.0",
+    "1.1.0",
+    "1.2.0",
+    "1.2.1"
   ],
   "jfmengels/review-debug": [
     "1.0.0",
     "2.0.0",
     "2.0.1"
+  ],
+  "jfmengels/review-documentation": [
+    "1.0.0"
+  ],
+  "jfmengels/review-tea": [
+    "1.0.0",
+    "1.1.0",
+    "1.1.1"
   ],
   "jfmengels/review-unused": [
     "1.0.0",
@@ -7844,7 +8171,12 @@ raw =
     "1.0.4",
     "2.0.0",
     "2.0.1",
-    "2.0.2"
+    "2.0.2",
+    "2.0.3",
+    "2.1.0",
+    "2.1.1",
+    "2.1.2",
+    "2.1.3"
   ],
   "jgrenat/elm-html-test-runner": [
     "1.0.0",
@@ -8188,7 +8520,8 @@ raw =
     "1.1.0",
     "1.1.1",
     "1.1.2",
-    "1.2.0"
+    "1.2.0",
+    "1.2.1"
   ],
   "jonoabroad/commatosed": [
     "1.0.0"
@@ -8230,7 +8563,8 @@ raw =
   ],
   "jouderianjr/elm-dialog": [
     "1.0.0",
-    "1.0.1"
+    "1.0.1",
+    "1.0.2"
   ],
   "jouderianjr/elm-loaders": [
     "1.0.0",
@@ -8270,7 +8604,8 @@ raw =
     "3.0.1",
     "4.0.0",
     "5.0.0",
-    "5.0.1"
+    "5.0.1",
+    "6.0.0"
   ],
   "jschomay/elm-paginate": [
     "1.0.0",
@@ -8372,10 +8707,17 @@ raw =
     "3.0.1",
     "4.0.0",
     "4.0.1",
-    "4.0.2"
+    "4.0.2",
+    "4.1.0",
+    "4.1.1",
+    "4.1.2",
+    "4.1.3"
   ],
   "justgook/webgl-shape": [
-    "1.0.0"
+    "1.0.0",
+    "2.0.0",
+    "2.0.1",
+    "2.0.2"
   ],
   "justinmimbs/date": [
     "1.0.0",
@@ -8387,7 +8729,8 @@ raw =
     "3.1.0",
     "3.1.1",
     "3.1.2",
-    "3.2.0"
+    "3.2.0",
+    "3.2.1"
   ],
   "justinmimbs/elm-arc-diagram": [
     "1.0.0"
@@ -8461,7 +8804,10 @@ raw =
     "1.1.1",
     "1.1.2",
     "1.1.3",
-    "1.1.4"
+    "1.1.4",
+    "1.2.0",
+    "1.2.1",
+    "1.2.2"
   ],
   "jweir/elm-iso8601": [
     "1.0.0",
@@ -8491,6 +8837,9 @@ raw =
     "2.0.2",
     "3.0.0",
     "4.0.0"
+  ],
+  "jwheeler-cp/elm-form": [
+    "1.0.0"
   ],
   "jwmerrill/elm-animation-frame": [
     "1.0.0",
@@ -8533,7 +8882,9 @@ raw =
     "2.0.0",
     "3.0.0",
     "3.1.0",
-    "3.1.1"
+    "3.1.1",
+    "3.1.2",
+    "3.1.3"
   ],
   "jxxcarlson/elm-graph": [
     "1.0.0",
@@ -8587,7 +8938,21 @@ raw =
     "9.1.0",
     "9.2.0",
     "9.2.1",
-    "9.2.2"
+    "9.2.2",
+    "9.2.3",
+    "9.2.4",
+    "9.2.5",
+    "9.2.6",
+    "9.2.7",
+    "9.2.8",
+    "9.2.9",
+    "9.2.10",
+    "9.2.11",
+    "9.2.12",
+    "9.2.13",
+    "9.2.14",
+    "9.2.15",
+    "9.2.16"
   ],
   "jxxcarlson/elm-pseudorandom": [
     "1.0.0",
@@ -8673,7 +9038,8 @@ raw =
     "1.0.0",
     "2.0.0",
     "3.0.0",
-    "3.0.1"
+    "3.0.1",
+    "3.1.0"
   ],
   "jxxcarlson/geometry": [
     "1.0.0",
@@ -8760,7 +9126,13 @@ raw =
     "10.0.6",
     "10.0.7",
     "10.0.8",
-    "11.0.0"
+    "11.0.0",
+    "11.0.1",
+    "11.0.2",
+    "12.0.0",
+    "12.0.1",
+    "12.1.0",
+    "13.0.0"
   ],
   "jxxcarlson/minilatex": [
     "1.0.0",
@@ -8834,7 +9206,9 @@ raw =
     "4.0.0",
     "5.0.0",
     "6.0.0",
-    "7.0.0"
+    "7.0.0",
+    "7.0.1",
+    "8.0.0"
   ],
   "karldray/elm-ref": [
     "1.0.0",
@@ -8971,6 +9345,10 @@ raw =
     "2.1.2"
   ],
   "korutx/elm-rut": [
+    "1.0.0",
+    "1.0.1"
+  ],
+  "koskoci/elm-sortable-table": [
     "1.0.0",
     "1.0.1"
   ],
@@ -9400,6 +9778,10 @@ raw =
     "3.0.2",
     "3.0.3"
   ],
+  "layflags/elm-bic": [
+    "1.0.0",
+    "2.0.0"
+  ],
   "lazamar/dict-parser": [
     "1.0.0",
     "1.0.1",
@@ -9416,8 +9798,15 @@ raw =
     "2.0.0",
     "2.0.1"
   ],
+  "leojpod/review-no-empty-html-text": [
+    "1.0.0"
+  ],
   "leonardanyer/elm-combox": [
     "1.0.0"
+  ],
+  "lettenj61/elm-reusable-html": [
+    "1.0.0",
+    "2.0.0"
   ],
   "lgastako/elm-select": [
     "1.0.0",
@@ -9579,7 +9968,8 @@ raw =
     "5.1.0",
     "5.2.0",
     "6.0.0",
-    "7.0.0"
+    "7.0.0",
+    "7.0.1"
   ],
   "lukewestby/elm-http-extra": [
     "1.0.0",
@@ -9631,6 +10021,10 @@ raw =
     "1.0.2",
     "2.0.0",
     "2.0.1"
+  ],
+  "lxierita/no-typealias-constructor-call": [
+    "1.0.0",
+    "1.0.1"
   ],
   "lynn/elm-arithmetic": [
     "1.0.0",
@@ -9698,6 +10092,14 @@ raw =
   "maksar/elm-workflow": [
     "1.0.0",
     "1.0.1",
+    "1.1.0",
+    "2.0.0"
+  ],
+  "malaire/elm-safe-int": [
+    "1.0.0"
+  ],
+  "malaire/elm-uint64": [
+    "1.0.0",
     "1.1.0",
     "2.0.0"
   ],
@@ -9777,7 +10179,10 @@ raw =
   ],
   "matheus23/elm-markdown-transforms": [
     "1.0.0",
-    "1.0.1"
+    "1.0.1",
+    "1.0.2",
+    "2.0.0",
+    "2.0.1"
   ],
   "matheus23/please-focus-more": [
     "1.0.0"
@@ -9809,6 +10214,13 @@ raw =
     "1.0.0",
     "1.0.1",
     "1.1.0"
+  ],
+  "mbr/elm-extras": [
+    "1.0.0",
+    "1.1.0",
+    "1.2.0",
+    "1.2.1",
+    "2.0.0"
   ],
   "mbr/elm-mouse-events": [
     "1.0.0",
@@ -9858,7 +10270,10 @@ raw =
   ],
   "mdgriffith/elm-animator": [
     "1.0.0",
-    "1.0.1"
+    "1.0.1",
+    "1.0.2",
+    "1.1.0",
+    "1.1.1"
   ],
   "mdgriffith/elm-color-mixing": [
     "1.0.0",
@@ -9926,7 +10341,9 @@ raw =
     "1.1.2",
     "1.1.3",
     "1.1.4",
-    "1.1.5"
+    "1.1.5",
+    "1.1.6",
+    "1.1.7"
   ],
   "mdgriffith/style-elements": [
     "2.0.0",
@@ -9989,7 +10406,8 @@ raw =
     "1.1.0",
     "2.0.0",
     "2.0.1",
-    "2.0.2"
+    "2.0.2",
+    "2.0.3"
   ],
   "mercurymedia/elm-message-toast": [
     "1.0.0",
@@ -10106,6 +10524,9 @@ raw =
     "1.0.1",
     "1.0.2"
   ],
+  "mgree/trampoline": [
+    "1.0.0"
+  ],
   "mhoare/elm-stack": [
     "1.0.0",
     "1.0.1",
@@ -10144,6 +10565,9 @@ raw =
     "1.1.0",
     "1.2.0",
     "1.2.1"
+  ],
+  "miniBill/elm-avataaars": [
+    "1.0.0"
   ],
   "miniBill/elm-codec": [
     "1.0.0",
@@ -10508,7 +10932,12 @@ raw =
     "16.0.1",
     "16.0.2",
     "16.0.3",
-    "16.0.4"
+    "16.0.4",
+    "17.0.0",
+    "17.1.0",
+    "17.1.1",
+    "17.2.0",
+    "18.0.0"
   ],
   "nicmr/compgeo": [
     "1.0.0",
@@ -10689,6 +11118,10 @@ raw =
     "2.0.0",
     "2.1.0"
   ],
+  "oaalto/time-values": [
+    "1.0.0",
+    "2.0.0"
+  ],
   "ohanhi/autoexpand": [
     "1.0.0",
     "1.0.1",
@@ -10709,7 +11142,8 @@ raw =
   "ohanhi/keyboard": [
     "1.0.0",
     "1.1.0",
-    "2.0.0"
+    "2.0.0",
+    "2.0.1"
   ],
   "ohanhi/keyboard-extra": [
     "1.0.0",
@@ -10963,6 +11397,9 @@ raw =
     "1.0.0",
     "1.0.1"
   ],
+  "pd-andy/elm-limiter": [
+    "1.0.0"
+  ],
   "pd-andy/elm-web-audio": [
     "1.0.0",
     "2.0.0",
@@ -11058,7 +11495,8 @@ raw =
     "8.1.3",
     "8.2.0",
     "8.3.0",
-    "8.4.0"
+    "8.4.0",
+    "8.5.0"
   ],
   "peterszerzo/elm-cms": [
     "1.0.0",
@@ -11165,13 +11603,29 @@ raw =
     "1.0.0",
     "1.0.1"
   ],
+  "pfcoperez/elm-playground": [
+    "1.0.0",
+    "1.0.1",
+    "1.1.0"
+  ],
+  "phollyer/elm-phoenix-websocket": [
+    "1.0.0",
+    "1.0.1",
+    "1.0.2",
+    "1.0.3",
+    "1.0.4",
+    "1.1.0"
+  ],
   "phollyer/elm-ui-colors": [
     "1.0.0",
     "1.0.1",
     "1.0.2",
     "1.0.3",
     "1.0.4",
-    "1.0.5"
+    "1.0.5",
+    "2.0.0",
+    "2.0.1",
+    "3.0.0"
   ],
   "pietro909/elm-sticky-header": [
     "1.0.0",
@@ -11483,7 +11937,8 @@ raw =
     "1.0.0"
   ],
   "r-k-b/no-long-import-lines": [
-    "1.0.0"
+    "1.0.0",
+    "1.0.1"
   ],
   "rainteller/elm-capitalize": [
     "1.0.0",
@@ -11597,7 +12052,12 @@ raw =
     "1.0.0",
     "1.0.1",
     "1.0.2",
-    "1.1.0"
+    "1.1.0",
+    "2.0.0"
+  ],
+  "rl-king/elm-iso3166-country-codes": [
+    "1.0.0",
+    "2.0.0"
   ],
   "rl-king/elm-masonry": [
     "1.0.0"
@@ -11613,7 +12073,8 @@ raw =
   ],
   "rl-king/elm-scroll-to": [
     "1.0.0",
-    "1.1.0"
+    "1.1.0",
+    "1.1.1"
   ],
   "rluiten/elm-date-extra": [
     "1.1.0",
@@ -11829,6 +12290,9 @@ raw =
     "2.0.1",
     "3.0.0"
   ],
+  "romariolopezc/elm-sentry": [
+    "1.0.0"
+  ],
   "romstad/elm-chess": [
     "1.0.0",
     "1.0.1",
@@ -12017,6 +12481,16 @@ raw =
     "5.1.0",
     "6.0.0"
   ],
+  "ryan-senn/elm-google-domains": [
+    "1.0.0"
+  ],
+  "ryan-senn/elm-readability": [
+    "1.0.0",
+    "1.1.0"
+  ],
+  "ryan-senn/elm-tlds": [
+    "1.0.0"
+  ],
   "ryan-senn/stellar-elm-sdk": [
     "1.0.0",
     "1.0.1",
@@ -12052,7 +12526,8 @@ raw =
     "3.0.1",
     "3.0.2",
     "4.0.0",
-    "4.1.0"
+    "4.1.0",
+    "4.1.1"
   ],
   "ryanolsonx/elm-mock-http": [
     "1.0.0",
@@ -12078,7 +12553,8 @@ raw =
     "1.1.1"
   ],
   "s6o/elm-recase": [
-    "1.0.0"
+    "1.0.0",
+    "1.0.1"
   ],
   "s6o/elm-simplify": [
     "1.0.0"
@@ -12087,6 +12563,10 @@ raw =
     "1.0.0"
   ],
   "samueldple/material-color": [
+    "1.0.0",
+    "1.0.1"
+  ],
+  "samuelstevens/elm-csv": [
     "1.0.0",
     "1.0.1"
   ],
@@ -12350,6 +12830,9 @@ raw =
   "sli/autotable": [
     "1.0.0"
   ],
+  "smucode/elm-flat-colors": [
+    "1.0.0"
+  ],
   "smurfix/elm-dict-tree-zipper": [
     "1.0.0",
     "1.0.1",
@@ -12375,8 +12858,30 @@ raw =
     "1.0.0",
     "1.0.1"
   ],
+  "sparksp/elm-review-always": [
+    "1.0.0",
+    "1.0.1",
+    "1.0.2",
+    "1.0.3",
+    "1.0.4"
+  ],
+  "sparksp/elm-review-camelcase": [
+    "1.0.0",
+    "1.0.1",
+    "1.0.2",
+    "1.0.3",
+    "1.1.0"
+  ],
+  "sparksp/elm-review-forbidden-words": [
+    "1.0.0",
+    "1.0.1"
+  ],
   "sparksp/elm-review-ports": [
-    "1.0.0"
+    "1.0.0",
+    "1.0.1",
+    "1.0.2",
+    "1.1.0",
+    "1.2.0"
   ],
   "spect88/romkan-elm": [
     "1.0.0"
@@ -12533,7 +13038,9 @@ raw =
   ],
   "sporto/qs": [
     "1.0.0",
-    "1.0.1"
+    "1.0.1",
+    "1.1.0",
+    "1.2.0"
   ],
   "sporto/time-distance": [
     "1.0.0",
@@ -12610,7 +13117,9 @@ raw =
     "7.0.5",
     "7.0.6",
     "7.1.0",
-    "7.1.1"
+    "7.1.1",
+    "7.1.2",
+    "7.1.3"
   ],
   "stil4m/rfc2822-datetime": [
     "1.0.0",
@@ -12620,7 +13129,8 @@ raw =
   "stil4m/structured-writer": [
     "1.0.0",
     "1.0.1",
-    "1.0.2"
+    "1.0.2",
+    "1.0.3"
   ],
   "stoeffel/datetimepicker": [
     "1.0.0"
@@ -12661,12 +13171,29 @@ raw =
     "3.0.0",
     "3.0.1"
   ],
+  "sudo-rushil/elm-cards": [
+    "1.0.0",
+    "1.0.1",
+    "2.0.0",
+    "2.0.1",
+    "3.0.0",
+    "3.1.0",
+    "3.2.0"
+  ],
+  "supermacro/elm-antd": [
+    "1.0.0",
+    "2.0.0",
+    "3.0.0",
+    "3.0.1",
+    "3.1.0"
+  ],
   "supermario/elm-countries": [
     "1.0.0",
     "1.0.1",
     "1.0.2",
     "1.0.3",
-    "1.0.4"
+    "1.0.4",
+    "1.1.0"
   ],
   "supermario/html-test-runner": [
     "1.0.2",
@@ -12834,7 +13361,8 @@ raw =
     "4.1.0"
   ],
   "terezka/line-charts": [
-    "2.0.0"
+    "2.0.0",
+    "2.0.1"
   ],
   "terezka/url-parser": [
     "1.0.0"
@@ -12905,7 +13433,9 @@ raw =
     "1.2.0",
     "1.3.0",
     "1.4.0",
-    "2.0.0"
+    "2.0.0",
+    "3.0.0",
+    "3.0.1"
   ],
   "thSoft/key-constants": [
     "1.0.2",
@@ -12967,11 +13497,14 @@ raw =
     "2.0.0",
     "3.0.0",
     "3.0.1",
-    "4.0.0"
+    "4.0.0",
+    "5.0.0"
   ],
   "the-sett/elm-auth-aws": [
     "1.0.0",
-    "2.0.0"
+    "2.0.0",
+    "3.0.0",
+    "4.0.0"
   ],
   "the-sett/elm-aws-cognito": [
     "1.0.0",
@@ -12995,7 +13528,12 @@ raw =
     "3.1.0",
     "3.1.1",
     "4.0.0",
-    "4.1.0"
+    "4.1.0",
+    "5.0.0",
+    "5.0.1",
+    "6.0.0",
+    "7.0.0",
+    "7.1.0"
   ],
   "the-sett/elm-color": [
     "1.0.0",
@@ -13009,7 +13547,13 @@ raw =
     "1.0.0",
     "2.0.0",
     "2.0.1",
-    "2.1.0"
+    "2.1.0",
+    "2.2.0"
+  ],
+  "the-sett/elm-localstorage": [
+    "1.0.0",
+    "2.0.0",
+    "3.0.0"
   ],
   "the-sett/elm-one-many": [
     "1.0.0",
@@ -13033,7 +13577,8 @@ raw =
     "1.1.0",
     "1.2.0",
     "1.3.0",
-    "1.3.1"
+    "1.3.1",
+    "1.4.0"
   ],
   "the-sett/elm-serverless": [
     "1.0.0",
@@ -13132,6 +13677,13 @@ raw =
     "4.0.2",
     "4.0.3"
   ],
+  "thematthopkins/elm-test-journey": [
+    "1.0.0",
+    "1.0.1",
+    "2.0.0",
+    "2.1.0",
+    "3.0.0"
+  ],
   "thomasloh/elm-phone": [
     "1.0.0",
     "2.0.0",
@@ -13225,7 +13777,8 @@ raw =
     "3.4.0",
     "3.4.1",
     "3.5.0",
-    "3.5.1"
+    "3.5.1",
+    "3.5.2"
   ],
   "toastal/endo": [
     "1.0.0",
@@ -13302,6 +13855,31 @@ raw =
     "3.0.0"
   ],
   "treffynnon/elm-tfn": [
+    "1.0.0"
+  ],
+  "tremlab/bugsnag-elm": [
+    "1.0.0",
+    "2.0.0"
+  ],
+  "tricycle/elm-actor-framework": [
+    "1.0.0",
+    "1.0.1",
+    "1.1.0",
+    "1.2.0",
+    "1.3.0"
+  ],
+  "tricycle/elm-actor-framework-sandbox": [
+    "1.0.0",
+    "1.1.0"
+  ],
+  "tricycle/elm-actor-framework-template": [
+    "1.0.0"
+  ],
+  "tricycle/elm-actor-framework-template-html": [
+    "1.0.0",
+    "1.0.1"
+  ],
+  "tricycle/elm-actor-framework-template-markdown": [
     "1.0.0"
   ],
   "tricycle/elm-email": [
@@ -13382,7 +13960,9 @@ raw =
     "6.0.0",
     "7.0.0",
     "8.0.0",
-    "8.0.1"
+    "8.0.1",
+    "8.0.2",
+    "9.0.0"
   ],
   "trifectalabs/elm-polyline": [
     "1.0.0",
@@ -13452,6 +14032,20 @@ raw =
     "5.0.0",
     "6.0.0",
     "7.0.0"
+  ],
+  "truqu/elm-review-nobooleancase": [
+    "1.0.0"
+  ],
+  "truqu/elm-review-noleftpizza": [
+    "1.0.0",
+    "1.0.1",
+    "2.0.0"
+  ],
+  "truqu/elm-review-noredundantconcat": [
+    "1.0.0"
+  ],
+  "truqu/elm-review-noredundantcons": [
+    "1.0.0"
   ],
   "truqu/line-charts": [
     "1.0.0"
@@ -13535,7 +14129,9 @@ raw =
     "3.1.2"
   ],
   "turboMaCk/non-empty-list-alias": [
-    "1.0.0"
+    "1.0.0",
+    "1.0.1",
+    "1.1.0"
   ],
   "turboMaCk/queue": [
     "1.0.0",
@@ -13562,10 +14158,13 @@ raw =
     "1.0.0"
   ],
   "ursi/elm-throttle": [
-    "1.0.0"
+    "1.0.0",
+    "1.0.1"
   ],
   "ursi/support": [
-    "1.0.0"
+    "1.0.0",
+    "1.0.1",
+    "1.0.2"
   ],
   "utkarshkukreti/elm-inflect": [
     "1.0.0"
@@ -13777,7 +14376,8 @@ raw =
     "1.1.0"
   ],
   "wells-wood-research/elm-molecules": [
-    "1.0.0"
+    "1.0.0",
+    "2.0.0"
   ],
   "wende/elm-ast": [
     "1.0.0"
@@ -13803,6 +14403,9 @@ raw =
     "1.0.0",
     "1.1.0",
     "2.0.0"
+  ],
+  "whale9490/elm-split-pane": [
+    "1.0.0"
   ],
   "will-clarke/elm-tiled-map": [
     "1.0.0",
@@ -13926,7 +14529,8 @@ raw =
   ],
   "wittjosiah/elm-ordered-dict": [
     "1.0.0",
-    "1.0.1"
+    "1.0.1",
+    "1.0.2"
   ],
   "wjdhamilton/elm-json-api-helpers": [
     "1.0.0",
@@ -13941,6 +14545,9 @@ raw =
   "wolfadex/elm-text-adventure": [
     "1.0.0",
     "2.0.0"
+  ],
+  "wolfadex/locale-negotiation": [
+    "1.0.0"
   ],
   "wolfadex/tiler": [
     "1.0.0",
@@ -14026,7 +14633,8 @@ raw =
   ],
   "y0hy0h/ordered-containers": [
     "1.0.0",
-    "2.0.0"
+    "2.0.0",
+    "2.0.1"
   ],
   "ydschneider/regex-builder": [
     "1.0.0",
@@ -14076,6 +14684,10 @@ raw =
   "yujota/elm-asap-pathology-format": [
     "1.0.0"
   ],
+  "yujota/elm-collision-detection": [
+    "1.0.0",
+    "1.0.1"
+  ],
   "yujota/elm-makie": [
     "1.0.0"
   ],
@@ -14123,7 +14735,8 @@ raw =
     "4.0.2",
     "4.0.3",
     "4.0.4",
-    "4.0.5"
+    "4.0.5",
+    "4.0.6"
   ],
   "zaidan/elm-collision": [
     "1.0.0",

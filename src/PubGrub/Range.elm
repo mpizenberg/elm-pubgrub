@@ -1,4 +1,4 @@
-module Range exposing
+module PubGrub.Range exposing
     ( Range, toDebugString
     , none, any, exact, higherThan, lowerThan, between
     , negate, intersection, union
@@ -26,7 +26,7 @@ module Range exposing
 
 -}
 
-import Version exposing (Version)
+import PubGrub.Version as Version exposing (Version)
 
 
 {-| A range corresponds to any set of versions

@@ -1,4 +1,4 @@
-module Incompatibility exposing
+module PubGrub.Internal.Incompatibility exposing
     ( Incompatibility, asDict, notRoot, noVersion, unavailableDeps, fromDependencies, toDebugString
     , merge, priorCause
     , Relation(..), relation
@@ -36,10 +36,10 @@ This module provides functions to work with incompatibilities.
 
 import AssocList
 import Dict exposing (Dict)
-import Range exposing (Range)
-import Report
-import Term exposing (Term)
-import Version exposing (Version)
+import PubGrub.Internal.Report as Report
+import PubGrub.Internal.Term as Term exposing (Term)
+import PubGrub.Range as Range exposing (Range)
+import PubGrub.Version as Version exposing (Version)
 
 
 {-| An incompatibility is a set of terms that should never

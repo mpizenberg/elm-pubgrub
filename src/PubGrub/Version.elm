@@ -1,4 +1,4 @@
-module Version exposing
+module PubGrub.Version exposing
     ( Version, toDebugString, toTuple
     , zero, one, two, three
     , new, new_, fromTuple

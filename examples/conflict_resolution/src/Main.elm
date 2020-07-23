@@ -4,8 +4,9 @@ import Browser
 import Html exposing (Html)
 import Html.Events exposing (onClick)
 import PubGrub
-import Range exposing (Range)
-import Version exposing (Version)
+import PubGrub.Cache as Cache exposing (Cache)
+import PubGrub.Range as Range
+import PubGrub.Version as Version exposing (Version)
 
 
 main : Program () Model Msg
@@ -19,9 +20,14 @@ main =
 
 
 type Model
-    = Init PubGrub.Connectivity
+    = Init Connectivity
     | Solving ( PubGrub.State, PubGrub.Effect )
     | Solved (Result String PubGrub.Solution)
+
+
+type Connectivity
+    = Offline
+    | Online
 
 
 type Msg
@@ -32,63 +38,56 @@ type Msg
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( Init PubGrub.Online, Cmd.none )
+    ( Init Online, Cmd.none )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( msg, model ) of
         ( SwitchConnectivity, Init connectivity ) ->
-            if connectivity == PubGrub.Online then
-                ( Init PubGrub.Offline, Cmd.none )
-
-            else
-                ( Init PubGrub.Online, Cmd.none )
+            ( Init connectivity, Cmd.none )
 
         ( Solve, Init connectivity ) ->
-            let
-                actualCache =
-                    if connectivity == PubGrub.Offline then
-                        cache
+            case connectivity of
+                Offline ->
+                    ( PubGrub.solve (PubGrub.packagesConfigFromCache cache) "root" Version.one
+                        |> Solved
+                    , Cmd.none
+                    )
 
-                    else
-                        PubGrub.emptyCache
+                Online ->
+                    case PubGrub.init Cache.empty "root" Version.one of
+                        ( _, PubGrub.SignalEnd result ) ->
+                            ( Solved result, Cmd.none )
 
-                ( state, effect ) =
-                    PubGrub.init connectivity actualCache "root" Version.one
-            in
-            case effect of
-                PubGrub.SignalEnd result ->
-                    ( Solved result, Cmd.none )
-
-                _ ->
-                    ( Solving ( state, effect ), Cmd.none )
+                        stateAndEffect ->
+                            ( Solving stateAndEffect, Cmd.none )
 
         ( Simulate, Solving ( state, effect ) ) ->
             case effect of
                 PubGrub.ListVersions ( package, term ) ->
                     let
                         versions =
-                            simulateListVersions package
+                            Cache.listVersions cache package
 
                         pgMsg =
                             PubGrub.AvailableVersions package term versions
 
                         newStateAndEffect =
-                            PubGrub.update PubGrub.Online PubGrub.emptyCache pgMsg state
+                            PubGrub.update Cache.empty pgMsg state
                     in
                     ( Solving newStateAndEffect, Cmd.none )
 
                 PubGrub.RetrieveDependencies ( package, version ) ->
                     let
                         dependencies =
-                            simulateRetrieveDependencies package version
+                            Cache.listDependencies cache package version
 
                         pgMsg =
                             PubGrub.PackageDependencies package version dependencies
 
                         newStateAndEffect =
-                            PubGrub.update PubGrub.Online PubGrub.emptyCache pgMsg state
+                            PubGrub.update Cache.empty pgMsg state
                     in
                     ( Solving newStateAndEffect, Cmd.none )
 
@@ -108,55 +107,19 @@ update msg model =
 -- https://github.com/dart-lang/pub/blob/master/doc/solver.md#performing-conflict-resolution
 
 
-cache : PubGrub.Cache
+cache : Cache
 cache =
-    PubGrub.emptyCache
-        |> PubGrub.cachePackageVersions
+    Cache.empty
+        |> Cache.addPackageVersions
             [ ( "root", Version.one )
             , ( "foo", Version.one )
             , ( "foo", Version.two )
             , ( "bar", Version.one )
             ]
-        |> PubGrub.cacheDependencies "root" Version.one [ ( "foo", Range.higherThan Version.one ) ]
-        |> PubGrub.cacheDependencies "foo" Version.two [ ( "bar", Range.between Version.one Version.two ) ]
-        |> PubGrub.cacheDependencies "foo" Version.one []
-        |> PubGrub.cacheDependencies "bar" Version.one [ ( "foo", Range.between Version.one Version.two ) ]
-
-
-simulateListVersions : String -> List Version
-simulateListVersions package =
-    case package of
-        "root" ->
-            [ Version.one ]
-
-        "foo" ->
-            [ Version.one, Version.two ]
-                |> List.reverse
-
-        "bar" ->
-            [ Version.one ]
-
-        _ ->
-            []
-
-
-simulateRetrieveDependencies : String -> Version -> Maybe (List ( String, Range ))
-simulateRetrieveDependencies package version =
-    case ( package, Version.toTuple version ) of
-        ( "root", ( 1, 0, 0 ) ) ->
-            Just [ ( "foo", Range.higherThan Version.one ) ]
-
-        ( "foo", ( 2, 0, 0 ) ) ->
-            Just [ ( "bar", Range.between Version.one Version.two ) ]
-
-        ( "foo", ( 1, 0, 0 ) ) ->
-            Just []
-
-        ( "bar", ( 1, 0, 0 ) ) ->
-            Just [ ( "foo", Range.between Version.one Version.two ) ]
-
-        _ ->
-            Nothing
+        |> Cache.addDependencies "root" Version.one [ ( "foo", Range.higherThan Version.one ) ]
+        |> Cache.addDependencies "foo" Version.two [ ( "bar", Range.between Version.one Version.two ) ]
+        |> Cache.addDependencies "foo" Version.one []
+        |> Cache.addDependencies "bar" Version.one [ ( "foo", Range.between Version.one Version.two ) ]
 
 
 

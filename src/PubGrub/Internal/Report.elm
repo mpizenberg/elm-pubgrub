@@ -1,4 +1,4 @@
-module Report exposing
+module PubGrub.Internal.Report exposing
     ( Tree(..), generate
     , DerivedIncompat, Incompat, Kind(..)
     )
@@ -28,8 +28,8 @@ because only those for shared nodes will be reused later.
 -}
 
 import AssocList as Dict exposing (Dict)
-import Range exposing (Range)
-import Term exposing (Term(..))
+import PubGrub.Internal.Term as Term exposing (Term(..))
+import PubGrub.Range as Range exposing (Range)
 
 
 {-| Tree of incompatibilities leading to the root one.
