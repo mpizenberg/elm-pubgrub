@@ -290,6 +290,8 @@ applyDecision dependencies package version pgModel =
 
 
 {-| Configuration of available packages to solve dependencies.
+The strategy of which version should be preferably picked in the list of available versions
+is implied by the order of the list: first version in the list will be tried first.
 -}
 type alias PackagesConfig =
     { listAvailableVersions : String -> List Version
@@ -355,6 +357,15 @@ init cache root version =
 
 
 {-| Update the state of the PubGrub algorithm.
+
+For messages of the `AvailableVersions` variant,
+it is the caller responsability to order the versions in the list
+with preferred versions at the beginning of the list.
+As such, it is easy to try to pick the newest versions compatible
+by ordering the versions with a decreasing order.
+Alternatively, it can also be interesting to find the minimal versions
+(oldest) in order to verify that the tests pass with those.
+
 -}
 update : Cache -> Msg -> State -> ( State, Effect )
 update cache msg state =
