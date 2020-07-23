@@ -191,32 +191,32 @@ viewElement : Model -> Element Msg
 viewElement model =
     case model.state of
         Init inputText maybePackage ->
-            viewInit inputText maybePackage
+            viewInit model.cache inputText maybePackage
 
         PickedPackage package version config ->
-            viewPicked config package version
+            viewPicked model.cache config package version
 
         LoadedProject project config ->
-            viewProject config project
+            viewProject model.cache config project
 
         Solving solverState ->
-            viewSolving solverState
+            viewSolving model.cache solverState
 
         Error error ->
-            viewError error
+            viewError model.cache error
 
         Solution solution ->
-            viewSolution solution
+            viewSolution model.cache solution
 
 
 
 -- Init
 
 
-viewInit : String -> Maybe ( String, Version ) -> Element Msg
-viewInit inputText maybePackage =
+viewInit : Cache -> String -> Maybe ( String, Version ) -> Element Msg
+viewInit cache inputText maybePackage =
     Element.column [ Element.centerX, Element.spacing 20 ]
-        [ viewTopBar
+        [ viewTopBar cache
         , Widget.textButton (Material.outlinedButton Material.defaultPalette)
             { onPress = Just LoadElmJson
             , text = "Load elm.json"
@@ -243,14 +243,14 @@ viewInit inputText maybePackage =
 -- Picked
 
 
-viewPicked : Solver.Config -> String -> Version -> Element Msg
-viewPicked config package version =
+viewPicked : Cache -> Solver.Config -> String -> Version -> Element Msg
+viewPicked cache config package version =
     Element.column
         [ Element.centerX
         , Element.spacing 20
         , Element.width Element.shrink
         ]
-        [ viewTopBar
+        [ viewTopBar cache
         , Element.paragraph [ Element.Font.size 24 ]
             [ Element.text "Selected "
             , Element.el [ Element.Font.bold ] (Element.text package)
@@ -266,14 +266,14 @@ viewPicked config package version =
 -- Project
 
 
-viewProject : Solver.Config -> Project -> Element Msg
-viewProject config project =
+viewProject : Cache -> Solver.Config -> Project -> Element Msg
+viewProject cache config project =
     Element.column
         [ Element.centerX
         , Element.spacing 20
         , Element.width Element.shrink
         ]
-        [ viewTopBar
+        [ viewTopBar cache
         , case project of
             Project.Package package version dependencies ->
                 viewPackage package version dependencies
@@ -405,14 +405,14 @@ materialButtonRow =
 -- Solving
 
 
-viewSolving : Solver.State -> Element Msg
-viewSolving solverState =
+viewSolving : Cache -> Solver.State -> Element Msg
+viewSolving cache solverState =
     Element.column
         [ Element.centerX
         , Element.spacing 20
         , Element.width Element.shrink
         ]
-        [ viewTopBar
+        [ viewTopBar cache
         , Element.paragraph [ Element.Font.size 24 ]
             [ Element.text "Solving ..." ]
         , Element.paragraph [ Element.padding 20 ]
@@ -430,14 +430,14 @@ viewSolving solverState =
 -- Error
 
 
-viewError : String -> Element Msg
-viewError error =
+viewError : Cache -> String -> Element Msg
+viewError cache error =
     Element.column
         [ Element.centerX
         , Element.spacing 20
         , Element.width Element.shrink
         ]
-        [ viewTopBar
+        [ viewTopBar cache
         , Element.paragraph [ Element.Font.size 24 ]
             [ Element.text "Something went wrong!" ]
         , Element.column [ Element.spacing 20 ] <|
@@ -455,14 +455,14 @@ monospaced str =
 -- Solution
 
 
-viewSolution : List ( String, Version ) -> Element Msg
-viewSolution solution =
+viewSolution : Cache -> List ( String, Version ) -> Element Msg
+viewSolution cache solution =
     Element.column
         [ Element.centerX
         , Element.spacing 20
         , Element.width Element.shrink
         ]
-        [ viewTopBar
+        [ viewTopBar cache
         , Element.column []
             [ Element.el [ Element.Font.size 20 ] (Element.text "Solution:")
             , Element.el [ Element.padding 20 ] <|
@@ -484,10 +484,10 @@ viewVersion ( package, version ) =
 -- Common
 
 
-viewTopBar : Element Msg
-viewTopBar =
+viewTopBar : Cache -> Element Msg
+viewTopBar cache =
     Element.row [ Element.width Element.fill ]
-        [ backToHomeButton, filler, cacheInfo ]
+        [ backToHomeButton, filler, cacheInfo cache ]
 
 
 backToHomeButton : Element Msg
@@ -503,8 +503,8 @@ filler =
     Element.el [ Element.width Element.fill ] Element.none
 
 
-cacheInfo : Element msg
-cacheInfo =
+cacheInfo : Cache -> Element msg
+cacheInfo cache =
     Element.el [ Element.Font.size 12 ] (Element.text "Cached entries: ")
 
 
