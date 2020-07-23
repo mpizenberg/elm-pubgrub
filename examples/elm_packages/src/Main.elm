@@ -513,8 +513,14 @@ viewVersion ( package, version ) =
 
 viewTopBar : Cache -> Element Msg
 viewTopBar cache =
-    Element.row [ Element.width Element.fill ]
-        [ backToHomeButton, filler, cacheInfo cache ]
+    Element.row [ Element.width Element.fill, Element.spacing 20 ]
+        [ backToHomeButton, filler, historyInfo, filler, cacheInfo cache ]
+
+
+historyInfo : Element msg
+historyInfo =
+    Element.el [ Element.Font.size 8 ]
+        (Element.text "this demo only works for dependencies previous to 2020/05/01")
 
 
 backToHomeButton : Element Msg
