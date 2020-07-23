@@ -1,13 +1,15 @@
 module PubGrub.Cache exposing
-    ( Cache, empty, size
+    ( Cache, empty
     , addDependencies, addPackageVersions
+    , nbDependencies, nbPackageVersions
     , listVersions, listDependencies
     )
 
 {-| Cache already loaded packages information.
 
-@docs Cache, empty, size
+@docs Cache, empty
 @docs addDependencies, addPackageVersions
+@docs nbDependencies, nbPackageVersions
 @docs listVersions, listDependencies
 
 -}
@@ -39,10 +41,17 @@ empty =
         }
 
 
+{-| Number of entries with known dependencies.
+-}
+nbDependencies : Cache -> Int
+nbDependencies (Cache { dependencies }) =
+    Dict.size dependencies
+
+
 {-| Number of unique package versions.
 -}
-size : Cache -> Int
-size (Cache { packagesRaw }) =
+nbPackageVersions : Cache -> Int
+nbPackageVersions (Cache { packagesRaw }) =
     Array.length packagesRaw
 
 
