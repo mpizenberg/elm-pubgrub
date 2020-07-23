@@ -7,7 +7,7 @@ import ElmPackages
 import Project exposing (Project)
 import PubGrub
 import PubGrub.Cache as Cache exposing (Cache)
-import PubGrub.Range as Range exposing (Range)
+import PubGrub.Range exposing (Range)
 import PubGrub.Version as Version exposing (Version)
 
 
@@ -28,6 +28,10 @@ type Strategy
     | Oldest
 
 
+
+-- Initialization ####################################################
+
+
 defaultConfig : Config
 defaultConfig =
     { online = False
@@ -45,6 +49,10 @@ insertVersions package versions cache =
     List.map (Elm.Version.toTuple >> Version.fromTuple) versions
         |> List.map (\v -> ( package, v ))
         |> (\l -> Cache.addPackageVersions l cache)
+
+
+
+-- Published Package #################################################
 
 
 solvePackage : String -> Version -> Config -> Cache -> ( State, Cmd API.Msg )
@@ -85,6 +93,40 @@ updateHelper cache ( pgState, effect ) =
             ( Finished result, Cmd.none )
 
 
+
+-- Project elm.json ##################################################
+
+
+solve : Project -> Config -> Cache -> ( State, Cmd API.Msg )
+solve project { online, strategy } cache =
+    case project of
+        -- TODO: take into account that the root package dependencies (elm.json)
+        -- may conflict with an existing published package.
+        -- Maybe we should add an incompatibility forbidding all versions of that package
+        -- (preventing cyclic dependencies)
+        Project.Package package version dependencies ->
+            if online then
+                PubGrub.init cache package version
+                    |> projectUpdateHelper cache package version dependencies
+
+            else
+                ( PubGrub.solve (configFrom cache package version dependencies) package version
+                    |> Finished
+                , Cmd.none
+                )
+
+        Project.Application dependencies ->
+            if online then
+                PubGrub.init cache "root" Version.one
+                    |> projectUpdateHelper cache "root" Version.one dependencies
+
+            else
+                ( PubGrub.solve (configFrom cache "root" Version.one dependencies) "root" Version.one
+                    |> Finished
+                , Cmd.none
+                )
+
+
 projectUpdateHelper : Cache -> String -> Version -> List ( String, Range ) -> ( PubGrub.State, PubGrub.Effect ) -> ( State, Cmd API.Msg )
 projectUpdateHelper cache root rootVersion dependencies ( pgState, effect ) =
     case effect of
@@ -120,6 +162,10 @@ projectUpdateHelper cache root rootVersion dependencies ( pgState, effect ) =
 
         PubGrub.SignalEnd result ->
             ( Finished result, Cmd.none )
+
+
+
+-- Common to published and elm.json ##################################
 
 
 update : Cache -> API.Msg -> State -> ( Cache, State, Cmd API.Msg )
@@ -177,36 +223,6 @@ update cache msg state =
 
         _ ->
             ( cache, state, Cmd.none )
-
-
-solve : Project -> Config -> Cache -> ( State, Cmd API.Msg )
-solve project { online, strategy } cache =
-    case project of
-        -- TODO: take into account that the root package
-        -- may have updated dependencies compared
-        -- to one that may already be in cache
-        -- (in case working on that package)
-        Project.Package package version dependencies ->
-            if online then
-                PubGrub.init cache package version
-                    |> projectUpdateHelper cache package version dependencies
-
-            else
-                ( PubGrub.solve (configFrom cache package version dependencies) package version
-                    |> Finished
-                , Cmd.none
-                )
-
-        Project.Application dependencies ->
-            if online then
-                PubGrub.init cache "root" Version.one
-                    |> projectUpdateHelper cache "root" Version.one dependencies
-
-            else
-                ( PubGrub.solve (configFrom cache "root" Version.one dependencies) "root" Version.one
-                    |> Finished
-                , Cmd.none
-                )
 
 
 configFrom : Cache -> String -> Version -> List ( String, Range ) -> PubGrub.PackagesConfig
