@@ -13,8 +13,8 @@ import PubGrub.Version as Version exposing (Version)
 
 type State
     = Finished (Result String PubGrub.Solution)
-    | Solving PubGrub.State PubGrub.Effect
-    | ProjectSolving String Version (List ( String, Range )) PubGrub.State PubGrub.Effect
+    | Solving Strategy PubGrub.State PubGrub.Effect
+    | ProjectSolving Strategy String Version (List ( String, Range )) PubGrub.State PubGrub.Effect
 
 
 type alias Config =
@@ -59,35 +59,40 @@ solvePackage : String -> Version -> Config -> Cache -> ( State, Cmd API.Msg )
 solvePackage root rootVersion { online, strategy } cache =
     if online then
         PubGrub.init cache root rootVersion
-            |> updateHelper cache
+            |> updateHelper cache strategy
 
     else
-        ( PubGrub.solve (PubGrub.packagesConfigFromCache cache) root rootVersion
+        ( PubGrub.solve (configFrom cache strategy "" Version.zero []) root rootVersion
             |> Finished
         , Cmd.none
         )
 
 
-updateHelper : Cache -> ( PubGrub.State, PubGrub.Effect ) -> ( State, Cmd API.Msg )
-updateHelper cache ( pgState, effect ) =
+updateHelper : Cache -> Strategy -> ( PubGrub.State, PubGrub.Effect ) -> ( State, Cmd API.Msg )
+updateHelper cache strategy ( pgState, effect ) =
     case effect of
         PubGrub.NoEffect ->
-            ( Solving pgState effect, Cmd.none )
+            ( Solving strategy pgState effect
+            , Cmd.none
+            )
 
         -- TODO: only update the list of packages and versions once at startup
         PubGrub.ListVersions ( package, term ) ->
             let
                 versions =
                     Cache.listVersions cache package
+                        |> sortStrategy strategy
 
                 msg =
                     PubGrub.AvailableVersions package term versions
             in
             PubGrub.update cache msg pgState
-                |> updateHelper cache
+                |> updateHelper cache strategy
 
         PubGrub.RetrieveDependencies ( package, version ) ->
-            ( Solving pgState effect, API.getDependencies package version )
+            ( Solving strategy pgState effect
+            , API.getDependencies package version
+            )
 
         PubGrub.SignalEnd result ->
             ( Finished result, Cmd.none )
@@ -107,10 +112,10 @@ solve project { online, strategy } cache =
         Project.Package package version dependencies ->
             if online then
                 PubGrub.init cache package version
-                    |> projectUpdateHelper cache package version dependencies
+                    |> projectUpdateHelper cache strategy package version dependencies
 
             else
-                ( PubGrub.solve (configFrom cache package version dependencies) package version
+                ( PubGrub.solve (configFrom cache strategy package version dependencies) package version
                     |> Finished
                 , Cmd.none
                 )
@@ -118,20 +123,22 @@ solve project { online, strategy } cache =
         Project.Application dependencies ->
             if online then
                 PubGrub.init cache "root" Version.one
-                    |> projectUpdateHelper cache "root" Version.one dependencies
+                    |> projectUpdateHelper cache strategy "root" Version.one dependencies
 
             else
-                ( PubGrub.solve (configFrom cache "root" Version.one dependencies) "root" Version.one
+                ( PubGrub.solve (configFrom cache strategy "root" Version.one dependencies) "root" Version.one
                     |> Finished
                 , Cmd.none
                 )
 
 
-projectUpdateHelper : Cache -> String -> Version -> List ( String, Range ) -> ( PubGrub.State, PubGrub.Effect ) -> ( State, Cmd API.Msg )
-projectUpdateHelper cache root rootVersion dependencies ( pgState, effect ) =
+projectUpdateHelper : Cache -> Strategy -> String -> Version -> List ( String, Range ) -> ( PubGrub.State, PubGrub.Effect ) -> ( State, Cmd API.Msg )
+projectUpdateHelper cache strategy root rootVersion dependencies ( pgState, effect ) =
     case effect of
         PubGrub.NoEffect ->
-            ( ProjectSolving root rootVersion dependencies pgState effect, Cmd.none )
+            ( ProjectSolving strategy root rootVersion dependencies pgState effect
+            , Cmd.none
+            )
 
         PubGrub.ListVersions ( package, term ) ->
             let
@@ -141,12 +148,13 @@ projectUpdateHelper cache root rootVersion dependencies ( pgState, effect ) =
 
                     else
                         Cache.listVersions cache package
+                            |> sortStrategy strategy
 
                 msg =
                     PubGrub.AvailableVersions package term versions
             in
             PubGrub.update cache msg pgState
-                |> projectUpdateHelper cache root rootVersion dependencies
+                |> projectUpdateHelper cache strategy root rootVersion dependencies
 
         PubGrub.RetrieveDependencies ( package, version ) ->
             if package == root && version == rootVersion then
@@ -155,10 +163,12 @@ projectUpdateHelper cache root rootVersion dependencies ( pgState, effect ) =
                         PubGrub.PackageDependencies root rootVersion (Just dependencies)
                 in
                 PubGrub.update cache msg pgState
-                    |> projectUpdateHelper cache root rootVersion dependencies
+                    |> projectUpdateHelper cache strategy root rootVersion dependencies
 
             else
-                ( ProjectSolving root rootVersion dependencies pgState effect, API.getDependencies package version )
+                ( ProjectSolving strategy root rootVersion dependencies pgState effect
+                , API.getDependencies package version
+                )
 
         PubGrub.SignalEnd result ->
             ( Finished result, Cmd.none )
@@ -171,7 +181,7 @@ projectUpdateHelper cache root rootVersion dependencies ( pgState, effect ) =
 update : Cache -> API.Msg -> State -> ( Cache, State, Cmd API.Msg )
 update cache msg state =
     case ( msg, state ) of
-        ( API.GotDeps package version (Ok elmProject), Solving pgState _ ) ->
+        ( API.GotDeps package version (Ok elmProject), Solving strategy pgState _ ) ->
             let
                 dependencies =
                     case Project.fromElmProject elmProject of
@@ -189,11 +199,11 @@ update cache msg state =
 
                 ( newPgState, effect ) =
                     PubGrub.update newCache pgMsg pgState
-                        |> updateHelper newCache
+                        |> updateHelper newCache strategy
             in
             ( newCache, newPgState, effect )
 
-        ( API.GotDeps package version (Ok elmProject), ProjectSolving root rootVersion rootDependencies pgState _ ) ->
+        ( API.GotDeps package version (Ok elmProject), ProjectSolving strategy root rootVersion rootDependencies pgState _ ) ->
             let
                 dependencies =
                     case Project.fromElmProject elmProject of
@@ -211,22 +221,22 @@ update cache msg state =
 
                 ( newPgState, effect ) =
                     PubGrub.update newCache pgMsg pgState
-                        |> projectUpdateHelper newCache root rootVersion rootDependencies
+                        |> projectUpdateHelper newCache strategy root rootVersion rootDependencies
             in
             ( newCache, newPgState, effect )
 
-        ( API.GotDeps _ _ (Err httpError), Solving _ _ ) ->
+        ( API.GotDeps _ _ (Err httpError), Solving _ _ _ ) ->
             ( cache, Finished (Err <| Debug.toString httpError), Cmd.none )
 
-        ( API.GotDeps _ _ (Err httpError), ProjectSolving _ _ _ _ _ ) ->
+        ( API.GotDeps _ _ (Err httpError), ProjectSolving _ _ _ _ _ _ ) ->
             ( cache, Finished (Err <| Debug.toString httpError), Cmd.none )
 
         _ ->
             ( cache, state, Cmd.none )
 
 
-configFrom : Cache -> String -> Version -> List ( String, Range ) -> PubGrub.PackagesConfig
-configFrom cache rootPackage rootVersion dependencies =
+configFrom : Cache -> Strategy -> String -> Version -> List ( String, Range ) -> PubGrub.PackagesConfig
+configFrom cache strategy rootPackage rootVersion dependencies =
     { listAvailableVersions =
         \package ->
             if package == rootPackage then
@@ -234,6 +244,7 @@ configFrom cache rootPackage rootVersion dependencies =
 
             else
                 Cache.listVersions cache package
+                    |> sortStrategy strategy
     , getDependencies =
         \package version ->
             if package == rootPackage && version == rootVersion then
@@ -242,3 +253,14 @@ configFrom cache rootPackage rootVersion dependencies =
             else
                 Cache.listDependencies cache package version
     }
+
+
+sortStrategy : Strategy -> List Version -> List Version
+sortStrategy strategy versions =
+    case strategy of
+        Oldest ->
+            List.sortBy Version.toTuple versions
+
+        Newest ->
+            List.sortBy Version.toTuple versions
+                |> List.reverse

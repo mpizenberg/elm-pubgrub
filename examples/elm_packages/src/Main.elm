@@ -163,6 +163,8 @@ update msg model =
 
         -- Solving
         ( ApiMsg apiMsg, Solving solverState ) ->
+            -- TODO: en fait, il faut que j'ajoute la strategy au solverState,
+            -- pas besoin d'ajouter l'argument en argument de update.
             case Solver.update model.cache apiMsg solverState of
                 ( newCache, Solver.Finished (Ok solution), _ ) ->
                     ( { cache = newCache, state = Solution solution }, Cmd.none )
@@ -444,7 +446,7 @@ viewSolving cache solverState =
             [ Element.text "Solving ..." ]
         , Element.paragraph [ Element.padding 20 ]
             [ case solverState of
-                Solver.Solving _ effect ->
+                Solver.Solving _ _ effect ->
                     Element.text ("Current effect being performed: " ++ PubGrub.effectToString effect)
 
                 _ ->
