@@ -14,6 +14,7 @@ import PubGrub.Version as Version exposing (Version)
 type State
     = Finished (Result String PubGrub.Solution)
     | Solving PubGrub.State PubGrub.Effect
+    | ProjectSolving String Version (List ( String, Range )) PubGrub.State PubGrub.Effect
 
 
 type alias Config =
@@ -84,6 +85,43 @@ updateHelper cache ( pgState, effect ) =
             ( Finished result, Cmd.none )
 
 
+projectUpdateHelper : Cache -> String -> Version -> List ( String, Range ) -> ( PubGrub.State, PubGrub.Effect ) -> ( State, Cmd API.Msg )
+projectUpdateHelper cache root rootVersion dependencies ( pgState, effect ) =
+    case effect of
+        PubGrub.NoEffect ->
+            ( ProjectSolving root rootVersion dependencies pgState effect, Cmd.none )
+
+        PubGrub.ListVersions ( package, term ) ->
+            let
+                versions =
+                    if package == root then
+                        [ rootVersion ]
+
+                    else
+                        Cache.listVersions cache package
+
+                msg =
+                    PubGrub.AvailableVersions package term versions
+            in
+            PubGrub.update cache msg pgState
+                |> projectUpdateHelper cache root rootVersion dependencies
+
+        PubGrub.RetrieveDependencies ( package, version ) ->
+            if package == root && version == rootVersion then
+                let
+                    msg =
+                        PubGrub.PackageDependencies root rootVersion (Just dependencies)
+                in
+                PubGrub.update cache msg pgState
+                    |> projectUpdateHelper cache root rootVersion dependencies
+
+            else
+                ( ProjectSolving root rootVersion dependencies pgState effect, API.getDependencies package version )
+
+        PubGrub.SignalEnd result ->
+            ( Finished result, Cmd.none )
+
+
 update : Cache -> API.Msg -> State -> ( Cache, State, Cmd API.Msg )
 update cache msg state =
     case ( msg, state ) of
@@ -109,7 +147,32 @@ update cache msg state =
             in
             ( newCache, newPgState, effect )
 
+        ( API.GotDeps package version (Ok elmProject), ProjectSolving root rootVersion rootDependencies pgState _ ) ->
+            let
+                dependencies =
+                    case Project.fromElmProject elmProject of
+                        Project.Package _ _ deps ->
+                            deps
+
+                        Project.Application deps ->
+                            deps
+
+                newCache =
+                    Cache.addDependencies package version dependencies cache
+
+                pgMsg =
+                    PubGrub.PackageDependencies package version (Just dependencies)
+
+                ( newPgState, effect ) =
+                    PubGrub.update newCache pgMsg pgState
+                        |> projectUpdateHelper newCache root rootVersion rootDependencies
+            in
+            ( newCache, newPgState, effect )
+
         ( API.GotDeps _ _ (Err httpError), Solving _ _ ) ->
+            ( cache, Finished (Err <| Debug.toString httpError), Cmd.none )
+
+        ( API.GotDeps _ _ (Err httpError), ProjectSolving _ _ _ _ _ ) ->
             ( cache, Finished (Err <| Debug.toString httpError), Cmd.none )
 
         _ ->
@@ -125,11 +188,8 @@ solve project { online, strategy } cache =
         -- (in case working on that package)
         Project.Package package version dependencies ->
             if online then
-                -- TODO: take into account the fact that we know
-                -- direct dependencies of package@version already,
-                -- but without corrupting the cache?
                 PubGrub.init cache package version
-                    |> updateHelper cache
+                    |> projectUpdateHelper cache package version dependencies
 
             else
                 ( PubGrub.solve (configFrom cache package version dependencies) package version
@@ -139,7 +199,8 @@ solve project { online, strategy } cache =
 
         Project.Application dependencies ->
             if online then
-                Debug.todo "TODO"
+                PubGrub.init cache "root" Version.one
+                    |> projectUpdateHelper cache "root" Version.one dependencies
 
             else
                 ( PubGrub.solve (configFrom cache "root" Version.one dependencies) "root" Version.one
