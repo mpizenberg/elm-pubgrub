@@ -330,11 +330,38 @@ viewDependency ( package, range ) =
 
 viewConfig : Solver.Config -> Element Msg
 viewConfig { online, strategy } =
-    Element.row [ Element.spacing 20 ]
-        [ Element.text "Connectivity:"
-        , viewConnectivity online
-        , Element.text "Version strategy:"
-        , viewStrategy strategy
+    Element.column [ Element.spacing 20 ]
+        [ Element.row [ Element.spacing 20 ]
+            [ Element.text "Connectivity:"
+            , viewConnectivity online
+            , Element.text "Version strategy:"
+            , viewStrategy strategy
+            ]
+        , infoConnectivity online
+        , infoStrategy strategy
+        ]
+
+
+infoConnectivity : Bool -> Element msg
+infoConnectivity online =
+    Element.paragraph []
+        [ if online then
+            Element.text "Online mode will make http requests to package.elm-lang.org, use with moderation, preferably on small dependency trees. Your cache will grow (see top right corner) if new information is downloaded. PS: cache is reset on page reload."
+
+          else
+            Element.text "Offline mode will never make any http request. Solving will fail if a list of dependencies of some package is required but not available in cache. PS: cache is reset on page reload."
+        ]
+
+
+infoStrategy : Solver.Strategy -> Element msg
+infoStrategy strategy =
+    Element.paragraph []
+        [ case strategy of
+            Solver.Newest ->
+                Element.text "The \"Newest\" strategy consists in always picking the newest package that dependency constraints authorize"
+
+            Solver.Oldest ->
+                Element.text "The \"Oldest\" strategy consists in always picking the oldest package that dependency constraints authorize"
         ]
 
 
