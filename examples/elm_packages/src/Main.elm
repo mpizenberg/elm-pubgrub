@@ -14,7 +14,7 @@ import Html exposing (Html)
 import Json.Decode
 import Project exposing (Project)
 import PubGrub
-import PubGrub.Cache exposing (Cache)
+import PubGrub.Cache as Cache exposing (Cache)
 import PubGrub.Range as Range exposing (Range)
 import PubGrub.Version as Version exposing (Version)
 import Solver
@@ -505,7 +505,13 @@ filler =
 
 cacheInfo : Cache -> Element msg
 cacheInfo cache =
-    Element.el [ Element.Font.size 12 ] (Element.text "Cached entries: ")
+    Element.el [ Element.Font.size 12 ]
+        (Element.text ("Cached entries: " ++ String.fromInt (cacheSize cache)))
+
+
+cacheSize : Cache -> Int
+cacheSize cache =
+    Cache.nbDependencies cache + Cache.nbPackageVersions cache
 
 
 solveButton : Element Msg
