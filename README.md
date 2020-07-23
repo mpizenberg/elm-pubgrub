@@ -70,7 +70,7 @@ Every time an effect may be required, it stops and informs the caller,
 which may resume the algorithm once necessary data is loaded.
 
 ```elm
-PubGrub.update : Connectivity -> Cache -> Msg -> State -> ( State, Effect )
+PubGrub.update : Cache -> Msg -> State -> ( State, Effect )
 ```
 
 The `Effect` type is public to enable the caller to perform
@@ -79,8 +79,7 @@ The `Msg` type is also public to drive the algorithm according
 to what was expected in the last effect when resuming.
 
 At any point between two `update` calls,
-the caller can change the `Connectivity`
-and update the `Cache` of already loaded data.
+the caller can update the `Cache` of already loaded data.
 
 The algorithm informs the caller that all is done
 when the `SignalEnd result` effect is emitted.
