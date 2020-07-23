@@ -544,7 +544,7 @@ viewTopBar cache =
 historyInfo : Element msg
 historyInfo =
     Element.el [ Element.Font.size 8 ]
-        (Element.text "this demo only works for dependencies previous to 2020/05/01")
+        (Element.text "this demo only works for dependencies previous to 2020/07/22")
 
 
 backToHomeButton : Element Msg
