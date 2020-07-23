@@ -1,14 +1,11 @@
 module ElmPackages exposing
     ( allPackages
-    , packageVersionDecoder, packageVersionFromString
+    , packageVersionFromString
     )
 
 {-| Pre-loaded history of all elm package versions.
 NOT USED YET, I'm still in the debugging phase,
 with handcrafted examples in Database.Stub.
-
-@docs allPackages
-
 -}
 
 import Dict exposing (Dict)
@@ -17,22 +14,11 @@ import Json.Decode exposing (Decoder)
 import Json.Encode
 
 
-packageVersionDecoder : Decoder ( String, Version )
-packageVersionDecoder =
-    Json.Decode.string
-        |> Json.Decode.andThen decodeStringPackageVersion
+{-| Convert a string of the form: "user/package@version"
+into a string package "user/package" and a Version.
 
-
-decodeStringPackageVersion : String -> Decoder ( String, Version )
-decodeStringPackageVersion str =
-    case packageVersionFromString str of
-        Ok ( package, elmVersion ) ->
-            Json.Decode.succeed ( package, elmVersion )
-
-        Err err ->
-            Json.Decode.fail err
-
-
+Fail with an error message if the string is not valid.
+-}
 packageVersionFromString : String -> Result String ( String, Version )
 packageVersionFromString str =
     case String.split "@" str of
@@ -52,7 +38,10 @@ packageVersionFromString str =
 -- Preloaded history
 
 
-{-| List of all packages exisiting to this moment.
+{-| List of all packages exisiting the last time the following command was used:
+
+    curl -L https://package.elm-lang.org/all-packages | jq . > history.json
+
 -}
 allPackages : Dict String (List Version)
 allPackages =

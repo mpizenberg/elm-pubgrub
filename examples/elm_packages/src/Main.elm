@@ -39,34 +39,52 @@ main =
 
 
 type alias Model =
+    -- Cache for the PubGrub algorithm
     { cache : Cache
+
+    -- Current state of the application
     , state : State
     }
 
 
-type State
+type State {- Init formInput maybePackage (maybePackage is the parsed form input) -}
     = Init String (Maybe ( String, Version ))
+      -- LoadedProject state for when an elm.json has successfully been parsed
     | LoadedProject Project Solver.Config
+      -- PickedPackage state when the package in the form input is validated
     | PickedPackage String Version Solver.Config
+      -- Solving state is an intermediate state while solving with "Online" connectivity
     | Solving Solver.State
+      -- If any error happens, use this state
     | Error String
+      -- When the solver successfully obtained a list of dependencies
     | Solution (List ( String, Version ))
 
 
 type Msg
     = NoMsg
+      -- Return to home page
     | BackHome
+      -- The "Load elm.json" button was clicked
     | LoadElmJson
+      -- The elm.json file was loaded as a File
     | ElmJsonFile File
+      -- The string content of the elm.json file was extracted
     | ElmJsonContent String
+      -- The form input of the home page is being used
     | Input String
+      -- Validate the choice of the package in the form input
     | PickPackage ( String, Version )
     | SwitchConnectivity Bool
     | SwitchStrategy Solver.Strategy
     | Solve
+      -- Messages used by the solver
     | ApiMsg API.Msg
 
 
+{-| Initialize the model.
+The cache is preloaded with data from the `ElmPackages.elm` file
+-}
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { cache = Solver.initCache
@@ -90,16 +108,19 @@ update msg model =
             ( { model | state = initialState }, Cmd.none )
 
         -- elm.json
+        -- The "Load elm.json" button was clicked
         ( LoadElmJson, Init _ _ ) ->
             ( { model | state = Init "" Nothing }
             , File.Select.file [ "application/json" ] ElmJsonFile
             )
 
+        -- The elm.json file was loaded as a File
         ( ElmJsonFile file, Init _ _ ) ->
             ( { model | state = Init "" Nothing }
             , Task.perform ElmJsonContent (File.toString file)
             )
 
+        -- The string content of the elm.json file was extracted
         ( ElmJsonContent content, Init _ _ ) ->
             case Json.Decode.decodeString Elm.Project.decoder content of
                 Ok elmProject ->
@@ -132,6 +153,7 @@ update msg model =
                     ( { model | state = Solving solverState }, Cmd.map ApiMsg cmd )
 
         -- Packages
+        -- The form input of the home page is being used
         ( Input input, Init _ _ ) ->
             let
                 maybePackage =
@@ -141,6 +163,7 @@ update msg model =
             in
             ( { model | state = Init input maybePackage }, Cmd.none )
 
+        -- Validate the choice of the package in the form input
         ( PickPackage ( package, version ), Init _ _ ) ->
             ( { model | state = PickedPackage package version Solver.defaultConfig }, Cmd.none )
 
@@ -162,9 +185,8 @@ update msg model =
                     ( { model | state = Solving solverState }, Cmd.map ApiMsg cmd )
 
         -- Solving
+        -- Messages used by the solver
         ( ApiMsg apiMsg, Solving solverState ) ->
-            -- TODO: en fait, il faut que j'ajoute la strategy au solverState,
-            -- pas besoin d'ajouter l'argument en argument de update.
             case Solver.update model.cache apiMsg solverState of
                 ( newCache, Solver.Finished (Ok solution), _ ) ->
                     ( { cache = newCache, state = Solution solution }, Cmd.none )

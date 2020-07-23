@@ -9,6 +9,11 @@ type Msg
     = GotDeps String Version (Result Http.Error Elm.Project.Project)
 
 
+{-| Retrieve dependencies of a given package thanks to package.elm-lang.org API.
+
+Use cors-anywhere service to bypass the CORS error.
+
+-}
 getDependencies : String -> Version -> Cmd Msg
 getDependencies package version =
     Http.get
@@ -21,15 +26,3 @@ getDependencies package version =
                 ++ "/elm.json"
         , expect = Http.expectJson (GotDeps package version) Elm.Project.decoder
         }
-
-
-
--- Http.request
---     { method = "GET"
---     , headers = [ Http.header "accept-encoding" "gzip" ]
---     , url = "https://package.elm-lang.org/packages/" ++ package ++ "/" ++ Version.toDebugString version ++ "/elm.json"
---     , body = Http.emptyBody
---     , expect = Http.expectJson GotDeps Json.Decode.string
---     , timeout = Nothing
---     , tracker = Nothing
---     }

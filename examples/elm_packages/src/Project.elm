@@ -12,11 +12,17 @@ import PubGrub.Version as Version exposing (Version)
 -- TODO: Add the Elm version to the dependencies (0.19 etc)
 
 
+{-| A project is either a package at a given version with given dependencies,
+or an application with given dependencies.
+-}
 type Project
     = Package String Version (List ( String, Range ))
     | Application (List ( String, Range ))
 
 
+{-| Convert the Project type from elm/project-metadata-utils
+into our Project type that only care about direct dependencies.
+-}
 fromElmProject : Elm.Project.Project -> Project
 fromElmProject elmProject =
     case elmProject of

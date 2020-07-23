@@ -1,4 +1,13 @@
-module Solver exposing (Config, State(..), Strategy(..), defaultConfig, initCache, solve, solvePackage, update)
+module Solver exposing
+    ( Config
+    , State(..)
+    , Strategy(..)
+    , defaultConfig
+    , initCache
+    , solve
+    , solvePackage
+    , update
+    )
 
 import API
 import Dict
@@ -11,6 +20,20 @@ import PubGrub.Range exposing (Range)
 import PubGrub.Version as Version exposing (Version)
 
 
+{-| State of the solver.
+
+The Finished variant indicates that the solver has ended,
+either with a successfull list of dependencies (PubGrub.Solution)
+or with an error message.
+
+The Solving and ProjectSolving variants serve the same role.
+The first one (Solving) is used for existing packages entered in the form input.
+The second one (ProjectSolving) is used when an elm.json file was loaded.
+
+The main difference between the two is that in the case of a project elm.json
+(package or application) the dependencies are directly provided in the elm.json.
+
+-}
 type State
     = Finished (Result String PubGrub.Solution)
     | Solving Strategy PubGrub.State PubGrub.Effect
@@ -23,6 +46,10 @@ type alias Config =
     }
 
 
+{-| The "Newest" strategy consists in picking the newest package possible
+satisfying the dependency constraints,
+while the "Oldest" strategy does the reverse.
+-}
 type Strategy
     = Newest
     | Oldest
@@ -39,6 +66,8 @@ defaultConfig =
     }
 
 
+{-| Put all preloaded packages into the cache for initialization.
+-}
 initCache : Cache
 initCache =
     Dict.foldl insertVersions Cache.empty ElmPackages.allPackages
@@ -53,6 +82,8 @@ insertVersions package versions cache =
 
 
 -- Published Package #################################################
+--
+-- This section deals with the case when a package was entered in the form input.
 
 
 solvePackage : String -> Version -> Config -> Cache -> ( State, Cmd API.Msg )
@@ -100,6 +131,8 @@ updateHelper cache strategy ( pgState, effect ) =
 
 
 -- Project elm.json ##################################################
+--
+-- This section deals with the case when an elm.json file was loaded.
 
 
 solve : Project -> Config -> Cache -> ( State, Cmd API.Msg )
@@ -178,9 +211,13 @@ projectUpdateHelper cache strategy root rootVersion dependencies ( pgState, effe
 -- Common to published and elm.json ##################################
 
 
+{-| Update the solver state when a new message arrives
+(dependencies of a packages have been downloaded).
+-}
 update : Cache -> API.Msg -> State -> ( Cache, State, Cmd API.Msg )
 update cache msg state =
     case ( msg, state ) of
+        -- This branch (state = Solving ...) is used when a package was entered in the input form.
         ( API.GotDeps package version (Ok elmProject), Solving strategy pgState _ ) ->
             let
                 dependencies =
@@ -203,6 +240,7 @@ update cache msg state =
             in
             ( newCache, newPgState, effect )
 
+        -- This branch (state = ProjectSolving ...) is used when an elm.json file was loaded.
         ( API.GotDeps package version (Ok elmProject), ProjectSolving strategy root rootVersion rootDependencies pgState _ ) ->
             let
                 dependencies =
@@ -225,6 +263,7 @@ update cache msg state =
             in
             ( newCache, newPgState, effect )
 
+        -- Terminate if an error occurred.
         ( API.GotDeps _ _ (Err httpError), Solving _ _ _ ) ->
             ( cache, Finished (Err <| Debug.toString httpError), Cmd.none )
 
@@ -235,6 +274,14 @@ update cache msg state =
             ( cache, state, Cmd.none )
 
 
+{-| Build a package configuration for the "Offline" mode (solving synchronously).
+
+Use the dependencies provided as argument if the solver asks for the dependency
+of the package and version also given as arguments here.
+
+Use the cache otherwise.
+
+-}
 configFrom : Cache -> Strategy -> String -> Version -> List ( String, Range ) -> PubGrub.PackagesConfig
 configFrom cache strategy rootPackage rootVersion dependencies =
     { listAvailableVersions =
@@ -255,6 +302,9 @@ configFrom cache strategy rootPackage rootVersion dependencies =
     }
 
 
+{-| Depending on the strategy (Oldest or Newest),
+sort the versions in increasing or decreasing order.
+-}
 sortStrategy : Strategy -> List Version -> List Version
 sortStrategy strategy versions =
     case strategy of
