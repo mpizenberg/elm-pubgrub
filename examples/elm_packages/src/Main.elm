@@ -466,9 +466,15 @@ viewError error =
             [ backToHomeButton, filler, cacheInfo ]
         , Element.paragraph [ Element.Font.size 24 ]
             [ Element.text "Something went wrong!" ]
-        , Element.paragraph [ Element.Font.family [ Element.Font.monospace ] ]
-            [ Element.text error ]
+        , Element.column [ Element.spacing 20 ] <|
+            List.map monospaced <|
+                String.split "\n" error
         ]
+
+
+monospaced : String -> Element msg
+monospaced str =
+    Element.paragraph [ Element.Font.family [ Element.Font.monospace ] ] [ Element.text str ]
 
 
 
