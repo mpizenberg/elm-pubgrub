@@ -1,4 +1,4 @@
-module PubGrub.Assignment exposing
+module PubGrub.Internal.Assignment exposing
     ( Assignment, Kind(..)
     , newDecision, newDerivation
     , getTerm, encodeDebug
@@ -17,9 +17,9 @@ the building block of a PubGrub partial solution
 -}
 
 import Json.Encode exposing (Value)
-import PubGrub.Incompatibility as Incompatibility exposing (Incompatibility)
+import PubGrub.Internal.Incompatibility as Incompatibility exposing (Incompatibility)
+import PubGrub.Internal.Term as Term exposing (Term)
 import PubGrub.Range as Range
-import PubGrub.Term as Term exposing (Term)
 import PubGrub.Version as Version exposing (Version)
 
 

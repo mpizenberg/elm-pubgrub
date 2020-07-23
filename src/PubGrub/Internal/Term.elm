@@ -1,4 +1,4 @@
-module PubGrub.Term exposing
+module PubGrub.Internal.Term exposing
     ( Term(..), isPositive, negate, toDebugString
     , acceptVersion, acceptVersionJust
     , intersection, union, listIntersection

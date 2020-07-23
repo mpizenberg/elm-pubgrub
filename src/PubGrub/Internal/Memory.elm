@@ -1,4 +1,4 @@
-module PubGrub.Memory exposing
+module PubGrub.Internal.Memory exposing
     ( Memory, PackageAssignments
     , fromDecision, fromDerivation, addAssignment, addDecision, addDerivation
     , terms
@@ -29,9 +29,9 @@ This module provides functions to manage it.
 -}
 
 import Dict exposing (Dict)
-import PubGrub.Assignment as Assignment exposing (Assignment)
+import PubGrub.Internal.Assignment as Assignment exposing (Assignment)
+import PubGrub.Internal.Term as Term exposing (Term)
 import PubGrub.Range as Range
-import PubGrub.Term as Term exposing (Term)
 import PubGrub.Version exposing (Version)
 import Utils exposing (SearchDecision(..))
 

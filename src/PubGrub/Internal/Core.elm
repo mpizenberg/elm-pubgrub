@@ -1,4 +1,4 @@
-module PubGrub.Core exposing
+module PubGrub.Internal.Core exposing
     ( Model
     , init, setIncompatibilities, mapIncompatibilities
     , pickPackage, pickVersion, unitPropagation
@@ -37,11 +37,11 @@ to write a functional PubGrub algorithm.
 -}
 
 import Dict
-import PubGrub.Assignment as Assignment
-import PubGrub.Incompatibility as Incompatibility exposing (Incompatibility)
-import PubGrub.PartialSolution as PartialSolution exposing (PartialSolution)
+import PubGrub.Internal.Assignment as Assignment
+import PubGrub.Internal.Incompatibility as Incompatibility exposing (Incompatibility)
+import PubGrub.Internal.PartialSolution as PartialSolution exposing (PartialSolution)
+import PubGrub.Internal.Term as Term exposing (Term)
 import PubGrub.Report as Report
-import PubGrub.Term as Term exposing (Term)
 import PubGrub.Version exposing (Version)
 
 

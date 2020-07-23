@@ -28,8 +28,8 @@ because only those for shared nodes will be reused later.
 -}
 
 import AssocList as Dict exposing (Dict)
+import PubGrub.Internal.Term as Term exposing (Term(..))
 import PubGrub.Range as Range exposing (Range)
-import PubGrub.Term as Term exposing (Term(..))
 
 
 {-| Tree of incompatibilities leading to the root one.
