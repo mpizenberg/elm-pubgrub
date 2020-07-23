@@ -201,6 +201,8 @@ effectToString effect =
                     "Solving terminated with an error"
 
 
+{-| Continue solving until the next `Effect` is required.
+-}
 updateEffect : Msg -> State -> ( State, Effect )
 updateEffect msg ((State { root, pgModel }) as state) =
     case msg of
@@ -217,7 +219,7 @@ updateEffect msg ((State { root, pgModel }) as state) =
                         updatedModel =
                             Core.mapIncompatibilities (Incompatibility.merge noVersionIncompat) pgModel
                     in
-                    solveRec root package updatedModel
+                    solveStep root package updatedModel
 
         PackageDependencies package version maybeDependencies ->
             case maybeDependencies of
@@ -229,18 +231,24 @@ updateEffect msg ((State { root, pgModel }) as state) =
                         updatedModel =
                             Core.mapIncompatibilities (Incompatibility.merge unavailableDepsIncompat) pgModel
                     in
-                    solveRec root package updatedModel
+                    solveStep root package updatedModel
 
                 Just deps ->
                     applyDecision deps package version pgModel
-                        |> solveRec root package
+                        |> solveStep root package
 
         NoMsg ->
             ( state, NoEffect )
 
 
-solveRec : String -> String -> Core.Model -> ( State, Effect )
-solveRec root package pgModel =
+{-| Advance the solver one step.
+
+It will either terminate (SignalEnd effect)
+or ask for the list of versions of a given package (ListVersions effect).
+
+-}
+solveStep : String -> String -> Core.Model -> ( State, Effect )
+solveStep root package pgModel =
     case Core.unitPropagation root package pgModel of
         Err msg ->
             ( State { root = root, pgModel = pgModel }, SignalEnd (Err msg) )
@@ -261,6 +269,9 @@ solveRec root package pgModel =
                     ( State { root = root, pgModel = updatedModel }, ListVersions packageAndTerm )
 
 
+{-| Update the model incompatibilities and partial solution
+with the package version we've just picked and its dependencies.
+-}
 applyDecision : List ( String, Range ) -> String -> Version -> Core.Model -> Core.Model
 applyDecision dependencies package version pgModel =
     let
@@ -300,6 +311,13 @@ type alias PackagesConfig =
 
 
 {-| Convenient conversion of a cache into available packages configuration.
+This is basically:
+
+    packagesConfigFromCache cache =
+        { listAvailableVersions = Cache.listVersions cache
+        , getDependencies = Cache.listDependencies cache
+        }
+
 -}
 packagesConfigFromCache : Cache -> PackagesConfig
 packagesConfigFromCache cache =
@@ -312,10 +330,13 @@ packagesConfigFromCache cache =
 -}
 solve : PackagesConfig -> String -> Version -> Result String Solution
 solve config root version =
-    solveRec root root (Core.init root version)
+    solveStep root root (Core.init root version)
         |> updateUntilFinished config
 
 
+{-| Recursively call updateEffect until the `SignalEnd` effect is emitted
+and a result can be returned.
+-}
 updateUntilFinished : PackagesConfig -> ( State, Effect ) -> Result String Solution
 updateUntilFinished config ( state, effect ) =
     case effect of
@@ -326,6 +347,8 @@ updateUntilFinished config ( state, effect ) =
             updateUntilFinished config (updateEffect (performSync config effect) state)
 
 
+{-| Convert an effect directly into a message according to the configuration.
+-}
 performSync : PackagesConfig -> Effect -> Msg
 performSync config effect =
     case effect of
@@ -352,7 +375,7 @@ performSync config effect =
 -}
 init : Cache -> String -> Version -> ( State, Effect )
 init cache root version =
-    solveRec root root (Core.init root version)
+    solveStep root root (Core.init root version)
         |> tryUpdateCached cache
 
 
@@ -373,6 +396,11 @@ update cache msg state =
         |> tryUpdateCached cache
 
 
+{-| If the provided effect is `RetrieveDependencies`,
+try to look for that package in the cache.
+If it is present, progress and repeat.
+Otherwise, just emit the effect.
+-}
 tryUpdateCached : Cache -> ( State, Effect ) -> ( State, Effect )
 tryUpdateCached cache stateAndEffect =
     case stateAndEffect of
@@ -380,7 +408,7 @@ tryUpdateCached cache stateAndEffect =
             case Cache.listDependencies cache package version of
                 Just deps ->
                     applyDecision deps package version pgModel
-                        |> solveRec root package
+                        |> solveStep root package
                         |> tryUpdateCached cache
 
                 Nothing ->
