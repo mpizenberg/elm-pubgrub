@@ -333,7 +333,7 @@ viewPackage package version dependencies =
 viewApplication : List ( String, Range ) -> Element msg
 viewApplication dependencies =
     Element.column []
-        [ Element.el [ Element.Font.size 20 ] (Element.text "Project dependencies:")
+        [ Element.el [ Element.Font.size 20 ] (Element.text "Project direct dependencies:")
         , Element.el [ Element.padding 20 ] <|
             if List.isEmpty dependencies then
                 Element.text "No dependencies"
