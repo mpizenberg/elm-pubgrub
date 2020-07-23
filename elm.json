@@ -12,9 +12,9 @@
         "PubGrub.Internal.Incompatibility",
         "PubGrub.Internal.Memory",
         "PubGrub.Internal.PartialSolution",
+        "PubGrub.Internal.Report",
         "PubGrub.Internal.Term",
         "PubGrub.Range",
-        "PubGrub.Report",
         "PubGrub.Version"
     ],
     "elm-version": "0.19.1 <= v < 0.20.0",

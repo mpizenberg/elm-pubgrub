@@ -36,9 +36,9 @@ This module provides functions to work with incompatibilities.
 
 import AssocList
 import Dict exposing (Dict)
+import PubGrub.Internal.Report as Report
 import PubGrub.Internal.Term as Term exposing (Term)
 import PubGrub.Range as Range exposing (Range)
-import PubGrub.Report as Report
 import PubGrub.Version as Version exposing (Version)
 
 

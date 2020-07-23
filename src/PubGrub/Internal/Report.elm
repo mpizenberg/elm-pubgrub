@@ -1,4 +1,4 @@
-module PubGrub.Report exposing
+module PubGrub.Internal.Report exposing
     ( Tree(..), generate
     , DerivedIncompat, Incompat, Kind(..)
     )

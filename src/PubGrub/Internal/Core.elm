@@ -40,8 +40,8 @@ import Dict
 import PubGrub.Internal.Assignment as Assignment
 import PubGrub.Internal.Incompatibility as Incompatibility exposing (Incompatibility)
 import PubGrub.Internal.PartialSolution as PartialSolution exposing (PartialSolution)
+import PubGrub.Internal.Report as Report
 import PubGrub.Internal.Term as Term exposing (Term)
-import PubGrub.Report as Report
 import PubGrub.Version exposing (Version)
 
 
