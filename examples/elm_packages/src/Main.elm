@@ -216,7 +216,8 @@ viewElement model =
 viewInit : String -> Maybe ( String, Version ) -> Element Msg
 viewInit inputText maybePackage =
     Element.column [ Element.centerX, Element.spacing 20 ]
-        [ Widget.textButton (Material.outlinedButton Material.defaultPalette)
+        [ viewTopBar
+        , Widget.textButton (Material.outlinedButton Material.defaultPalette)
             { onPress = Just LoadElmJson
             , text = "Load elm.json"
             }
@@ -226,7 +227,7 @@ viewInit inputText maybePackage =
             [ Element.Input.text []
                 { onChange = Input
                 , text = inputText
-                , placeholder = Just (Element.Input.placeholder [] (Element.text "toto@1.0.0"))
+                , placeholder = Just (Element.Input.placeholder [] (Element.text "elm/bytes@1.0.8"))
                 , label = Element.Input.labelLeft [] (Element.text "Package and version:")
                 }
             , Widget.iconButton (Material.containedButton Material.defaultPalette)
@@ -249,8 +250,7 @@ viewPicked config package version =
         , Element.spacing 20
         , Element.width Element.shrink
         ]
-        [ Element.row [ Element.width Element.fill ]
-            [ backToHomeButton, filler, cacheInfo ]
+        [ viewTopBar
         , Element.paragraph [ Element.Font.size 24 ]
             [ Element.text "Selected "
             , Element.el [ Element.Font.bold ] (Element.text package)
@@ -262,31 +262,70 @@ viewPicked config package version =
         ]
 
 
-cacheInfo : Element msg
-cacheInfo =
-    Element.el [ Element.Font.size 12 ] (Element.text "Cached entries: ")
+
+-- Project
 
 
-filler : Element msg
-filler =
-    Element.el [ Element.width Element.fill ] Element.none
+viewProject : Solver.Config -> Project -> Element Msg
+viewProject config project =
+    Element.column
+        [ Element.centerX
+        , Element.spacing 20
+        , Element.width Element.shrink
+        ]
+        [ viewTopBar
+        , case project of
+            Project.Package package version dependencies ->
+                viewPackage package version dependencies
+
+            Project.Application dependencies ->
+                viewApplication dependencies
+        , viewConfig config
+        , solveButton
+        ]
 
 
-backToHomeButton : Element Msg
-backToHomeButton =
-    Widget.textButton (Material.textButton Material.defaultPalette)
-        { onPress = Just BackHome
-        , text = "↩  Home"
-        }
+viewPackage : String -> Version -> List ( String, Range ) -> Element msg
+viewPackage package version dependencies =
+    Element.column []
+        [ Element.el [ Element.Font.size 20 ]
+            (Element.paragraph []
+                [ Element.text "Dependencies of "
+                , Element.el [ Element.Font.bold ] (Element.text package)
+                , Element.text " at version "
+                , Element.el [ Element.Font.bold ] (Element.text <| Version.toDebugString version)
+                , Element.text ":"
+                ]
+            )
+        , Element.el [ Element.padding 20 ] <|
+            if List.isEmpty dependencies then
+                Element.text "No dependencies"
+
+            else
+                Widget.column Material.column (List.map viewDependency dependencies)
+        ]
 
 
-solveButton : Element Msg
-solveButton =
-    Widget.textButton (Material.containedButton Material.defaultPalette)
-        { onPress = Just Solve
-        , text = "Solve"
-        }
-        |> Element.el [ Element.centerX ]
+viewApplication : List ( String, Range ) -> Element msg
+viewApplication dependencies =
+    Element.column []
+        [ Element.el [ Element.Font.size 20 ] (Element.text "Project dependencies:")
+        , Element.el [ Element.padding 20 ] <|
+            if List.isEmpty dependencies then
+                Element.text "No dependencies"
+
+            else
+                Widget.column Material.column (List.map viewDependency dependencies)
+        ]
+
+
+viewDependency : ( String, Range ) -> Element msg
+viewDependency ( package, range ) =
+    Element.text (package ++ " " ++ Range.toDebugString range)
+
+
+
+-- Config
 
 
 viewConfig : Solver.Config -> Element Msg
@@ -363,69 +402,6 @@ materialButtonRow =
 
 
 
--- Project
-
-
-viewProject : Solver.Config -> Project -> Element Msg
-viewProject config project =
-    Element.column
-        [ Element.centerX
-        , Element.spacing 20
-        , Element.width Element.shrink
-        ]
-        [ Element.row [ Element.width Element.fill ]
-            [ backToHomeButton, filler, cacheInfo ]
-        , case project of
-            Project.Package package version dependencies ->
-                viewPackage package version dependencies
-
-            Project.Application dependencies ->
-                viewApplication dependencies
-        , viewConfig config
-        , solveButton
-        ]
-
-
-viewPackage : String -> Version -> List ( String, Range ) -> Element msg
-viewPackage package version dependencies =
-    Element.column []
-        [ Element.el [ Element.Font.size 20 ]
-            (Element.paragraph []
-                [ Element.text "Dependencies of "
-                , Element.el [ Element.Font.bold ] (Element.text package)
-                , Element.text " at version "
-                , Element.el [ Element.Font.bold ] (Element.text <| Version.toDebugString version)
-                , Element.text ":"
-                ]
-            )
-        , Element.el [ Element.padding 20 ] <|
-            if List.isEmpty dependencies then
-                Element.text "No dependencies"
-
-            else
-                Widget.column Material.column (List.map viewDependency dependencies)
-        ]
-
-
-viewApplication : List ( String, Range ) -> Element msg
-viewApplication dependencies =
-    Element.column []
-        [ Element.el [ Element.Font.size 20 ] (Element.text "Project dependencies:")
-        , Element.el [ Element.padding 20 ] <|
-            if List.isEmpty dependencies then
-                Element.text "No dependencies"
-
-            else
-                Widget.column Material.column (List.map viewDependency dependencies)
-        ]
-
-
-viewDependency : ( String, Range ) -> Element msg
-viewDependency ( package, range ) =
-    Element.text (package ++ " " ++ Range.toDebugString range)
-
-
-
 -- Solving
 
 
@@ -436,8 +412,7 @@ viewSolving solverState =
         , Element.spacing 20
         , Element.width Element.shrink
         ]
-        [ Element.row [ Element.width Element.fill ]
-            [ backToHomeButton, filler, cacheInfo ]
+        [ viewTopBar
         , Element.paragraph [ Element.Font.size 24 ]
             [ Element.text "Solving ..." ]
         , Element.paragraph [ Element.padding 20 ]
@@ -462,8 +437,7 @@ viewError error =
         , Element.spacing 20
         , Element.width Element.shrink
         ]
-        [ Element.row [ Element.width Element.fill ]
-            [ backToHomeButton, filler, cacheInfo ]
+        [ viewTopBar
         , Element.paragraph [ Element.Font.size 24 ]
             [ Element.text "Something went wrong!" ]
         , Element.column [ Element.spacing 20 ] <|
@@ -488,8 +462,7 @@ viewSolution solution =
         , Element.spacing 20
         , Element.width Element.shrink
         ]
-        [ Element.row [ Element.width Element.fill ]
-            [ backToHomeButton, filler, cacheInfo ]
+        [ viewTopBar
         , Element.column []
             [ Element.el [ Element.Font.size 20 ] (Element.text "Solution:")
             , Element.el [ Element.padding 20 ] <|
@@ -505,3 +478,40 @@ viewSolution solution =
 viewVersion : ( String, Version ) -> Element msg
 viewVersion ( package, version ) =
     Element.text (package ++ " " ++ Version.toDebugString version)
+
+
+
+-- Common
+
+
+viewTopBar : Element Msg
+viewTopBar =
+    Element.row [ Element.width Element.fill ]
+        [ backToHomeButton, filler, cacheInfo ]
+
+
+backToHomeButton : Element Msg
+backToHomeButton =
+    Widget.textButton (Material.textButton Material.defaultPalette)
+        { onPress = Just BackHome
+        , text = "↩  Home"
+        }
+
+
+filler : Element msg
+filler =
+    Element.el [ Element.width Element.fill ] Element.none
+
+
+cacheInfo : Element msg
+cacheInfo =
+    Element.el [ Element.Font.size 12 ] (Element.text "Cached entries: ")
+
+
+solveButton : Element Msg
+solveButton =
+    Widget.textButton (Material.containedButton Material.defaultPalette)
+        { onPress = Just Solve
+        , text = "Solve"
+        }
+        |> Element.el [ Element.centerX ]
