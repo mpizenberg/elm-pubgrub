@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>elm-pubgrub</title>
+    <script src="idb.js"></script>
+    <script src="Main.js"></script>
+  </head>
+  <body>
+    <div id="myapp"></div>
+
+<script>
+(async () => {
+
+	// Initialize the database with a "dependencies" store.
+	const db = await idb.openDB('PubGrub', 1, {
+		upgrade(db) { db.createObjectStore('dependencies'); }
+	});
+
+	// Retrieve all keys and values of stored dependencies.
+	const keys = await db.getAllKeys('dependencies');
+	const values = await db.getAll('dependencies');
+
+	// Start the Elm application.
+	var app = Elm.Main.init({
+		node: document.getElementById('myapp'),
+		flags: { keys: keys, values: values },
+	});
+
+	// Port to save dependencies to the store.
+	app.ports.saveDependencies.subscribe((dep) => {
+		db.put('dependencies', dep.value, dep.key);
+	});
+
+})()
+</script>
+
+  </body>
+</html>

@@ -11,7 +11,7 @@ import ElmPackages
 import File exposing (File)
 import File.Select
 import Html exposing (Html)
-import Json.Decode
+import Json.Decode exposing (Value)
 import Project exposing (Project)
 import PubGrub
 import PubGrub.Cache as Cache exposing (Cache)
@@ -24,7 +24,7 @@ import Widget.Style
 import Widget.Style.Material as Material
 
 
-main : Program () Model Msg
+main : Program Value Model Msg
 main =
     Browser.element
         { init = init
@@ -85,13 +85,70 @@ type Msg
 {-| Initialize the model.
 The cache is preloaded with data from the `ElmPackages.elm` file
 -}
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( { cache = Solver.initCache
+init : Value -> ( Model, Cmd Msg )
+init flags =
+    let
+        -- Let's first retrieve all package ids ("keys") in the dependencies store.
+        keysStringDecoder =
+            Json.Decode.field "keys"
+                (Json.Decode.list Json.Decode.string)
+
+        keysString : List String
+        keysString =
+            Json.Decode.decodeValue keysStringDecoder flags
+                |> Result.withDefault []
+
+        keys : List ( String, Version )
+        keys =
+            List.filterMap
+                (ElmPackages.packageVersionFromString
+                    >> Result.toMaybe
+                    >> Maybe.map (Tuple.mapSecond Elm.Version.toTuple)
+                    >> Maybe.map (Tuple.mapSecond Version.fromTuple)
+                )
+                keysString
+
+        -- Now let's retrieve their associated dependencies.
+        valuesStringDecoder =
+            Json.Decode.field "values"
+                (Json.Decode.list (Json.Decode.list Json.Decode.string))
+
+        dependenciesString : List (List String)
+        dependenciesString =
+            Json.Decode.decodeValue valuesStringDecoder flags
+                |> Result.withDefault []
+
+        dependencies : List (List ( String, Range ))
+        dependencies =
+            List.map
+                (List.filterMap (packageRangeFromString >> Result.toMaybe))
+                dependenciesString
+
+        -- Merge package keys and associated dependencies into one list.
+        keysAndDeps =
+            List.map2 Tuple.pair keys dependencies
+    in
+    ( { cache =
+            List.foldl
+                (\( ( package, version ), deps ) -> Cache.addDependencies package version deps)
+                Solver.initCache
+                keysAndDeps
       , state = initialState
       }
     , Cmd.none
     )
+
+
+{-| Convert a string like "package@1.0.0 <= v < 2.0.0" into ( package, range ).
+-}
+packageRangeFromString : String -> Result String ( String, Range )
+packageRangeFromString str =
+    case String.split "@" str of
+        package :: rangeStr :: [] ->
+            Ok ( package, Project.rangeFromString rangeStr )
+
+        _ ->
+            Err ("Wrong package range format: " ++ str)
 
 
 initialState : State
@@ -187,15 +244,15 @@ update msg model =
         -- Solving
         -- Messages used by the solver
         ( ApiMsg apiMsg, Solving solverState ) ->
-            case Solver.update model.cache apiMsg solverState of
-                ( newCache, Solver.Finished (Ok solution), _ ) ->
-                    ( { cache = newCache, state = Solution solution }, Cmd.none )
+            case Solver.update ApiMsg model.cache apiMsg solverState of
+                ( newCache, Solver.Finished (Ok solution), cmd ) ->
+                    ( { cache = newCache, state = Solution solution }, cmd )
 
-                ( newCache, Solver.Finished (Err error), _ ) ->
-                    ( { cache = newCache, state = Error error }, Cmd.none )
+                ( newCache, Solver.Finished (Err error), cmd ) ->
+                    ( { cache = newCache, state = Error error }, cmd )
 
                 ( newCache, newSolverState, cmd ) ->
-                    ( { cache = newCache, state = Solving newSolverState }, Cmd.map ApiMsg cmd )
+                    ( { cache = newCache, state = Solving newSolverState }, cmd )
 
         _ ->
             ( model, Cmd.none )

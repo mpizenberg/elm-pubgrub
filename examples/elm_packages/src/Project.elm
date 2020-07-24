@@ -1,4 +1,4 @@
-module Project exposing (Project(..), fromElmProject)
+module Project exposing (Project(..), fromElmProject, rangeFromString)
 
 import Elm.Constraint
 import Elm.Package

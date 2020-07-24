@@ -1,4 +1,4 @@
-module Solver exposing
+port module Solver exposing
     ( Config
     , State(..)
     , Strategy(..)
@@ -13,11 +13,15 @@ import API
 import Dict
 import Elm.Version
 import ElmPackages
+import Json.Encode exposing (Value)
 import Project exposing (Project)
 import PubGrub
 import PubGrub.Cache as Cache exposing (Cache)
-import PubGrub.Range exposing (Range)
+import PubGrub.Range as Range exposing (Range)
 import PubGrub.Version as Version exposing (Version)
+
+
+port saveDependencies : Value -> Cmd msg
 
 
 {-| State of the solver.
@@ -214,8 +218,8 @@ projectUpdateHelper cache strategy root rootVersion dependencies ( pgState, effe
 {-| Update the solver state when a new message arrives
 (dependencies of a packages have been downloaded).
 -}
-update : Cache -> API.Msg -> State -> ( Cache, State, Cmd API.Msg )
-update cache msg state =
+update : (API.Msg -> msg) -> Cache -> API.Msg -> State -> ( Cache, State, Cmd msg )
+update toMsg cache msg state =
     case ( msg, state ) of
         -- This branch (state = Solving ...) is used when a package was entered in the input form.
         ( API.GotDeps package version (Ok elmProject), Solving strategy pgState _ ) ->
@@ -234,11 +238,17 @@ update cache msg state =
                 pgMsg =
                     PubGrub.PackageDependencies package version (Just dependencies)
 
-                ( newPgState, effect ) =
+                ( newPgState, newCmd ) =
                     PubGrub.update newCache pgMsg pgState
                         |> updateHelper newCache strategy
+
+                depsValue =
+                    Json.Encode.object
+                        [ ( "key", encodePackageVersion ( package, version ) )
+                        , ( "value", Json.Encode.list encodeDependency dependencies )
+                        ]
             in
-            ( newCache, newPgState, effect )
+            ( newCache, newPgState, Cmd.batch [ Cmd.map toMsg newCmd, saveDependencies depsValue ] )
 
         -- This branch (state = ProjectSolving ...) is used when an elm.json file was loaded.
         ( API.GotDeps package version (Ok elmProject), ProjectSolving strategy root rootVersion rootDependencies pgState _ ) ->
@@ -257,11 +267,17 @@ update cache msg state =
                 pgMsg =
                     PubGrub.PackageDependencies package version (Just dependencies)
 
-                ( newPgState, effect ) =
+                ( newPgState, newCmd ) =
                     PubGrub.update newCache pgMsg pgState
                         |> projectUpdateHelper newCache strategy root rootVersion rootDependencies
+
+                depsValue =
+                    Json.Encode.object
+                        [ ( "key", encodePackageVersion ( package, version ) )
+                        , ( "value", Json.Encode.list encodeDependency dependencies )
+                        ]
             in
-            ( newCache, newPgState, effect )
+            ( newCache, newPgState, Cmd.batch [ Cmd.map toMsg newCmd, saveDependencies depsValue ] )
 
         -- Terminate if an error occurred.
         ( API.GotDeps _ _ (Err httpError), Solving _ _ _ ) ->
@@ -272,6 +288,24 @@ update cache msg state =
 
         _ ->
             ( cache, state, Cmd.none )
+
+
+{-| Encode a package and a version into a JavaScript string
+of the form: "package@1.0.0"
+-}
+encodePackageVersion : ( String, Version ) -> Value
+encodePackageVersion ( package, version ) =
+    (package ++ "@" ++ Version.toDebugString version)
+        |> Json.Encode.string
+
+
+{-| Encode a dependency into a JavaScript string
+of the form: "package@1.0.0 <= v < 2.0.0"
+-}
+encodeDependency : ( String, Range ) -> Value
+encodeDependency ( package, range ) =
+    (package ++ "@" ++ Range.toDebugString range)
+        |> Json.Encode.string
 
 
 {-| Build a package configuration for the "Offline" mode (solving synchronously).
