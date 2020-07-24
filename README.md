@@ -41,12 +41,32 @@ with the following caracteristics, not only Elm packages.
 PS: at publication, modules in the `PubGrub.Internal` namespace will not be exposed.
 
 
+## Examples
+
+Two examples are located in the `examples/` folder.
+The `conflict_resolution` example, is a rather simple usage of the library
+with a custom dependency system (not Elm packages).
+You can start it easily with elm-reactor or elm-live.
+
+The second example is an advanced usage of the library API,
+in order to create a dependency solver for actual Elm packages.
+You can build it locally with `elm-live src/Main.elm -- --output=Main.j`
+or just try it online directly at
+[https://mpizenberg.github.io/elm-pubgrub/][elm-example].
+
+![image](https://user-images.githubusercontent.com/2905865/88414812-bff21000-cddd-11ea-9541-ebf700a45b6a.png)
+
+[elm-example]: https://mpizenberg.github.io/elm-pubgrub/
+
 ## API
 
 The algorithm is provided in two forms, synchronous and asynchronous.
 The synchronous API is quite straightforward.
 The async one uses the `Effect` pattern to be easily integrated
 into the TEA architecture.
+The API documentation is available on [elm-doc-preview][doc].
+
+[doc]: https://elm-doc-preview.netlify.app/?repo=mpizenberg/elm-pubgrub
 
 ### Direct sync call
 
@@ -105,13 +125,3 @@ by Martin Gebser, Roland Kaminski, Benjamin Kaufmann and Torsten Schaub.
 [medium-pubgrub]: https://medium.com/@nex3/pubgrub-2fb6470504f
 [github-pubgrub]: https://github.com/dart-lang/pub/blob/master/doc/solver.md
 [potassco-book]: https://potassco.org/book/
-
-
-## Elm packages (personal reminder)
-
-```sh
-curl -L https://package.elm-lang.org/all-packages | jq . > history.json
-curl -L https://package.elm-lang.org/all-packages/since/90 | jq . > history-since-90.json
-
-curl --compressed https://package.elm-lang.org/packages/elm/parser/1.1.0/elm.json > parser.elm.json
-```
