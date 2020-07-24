@@ -427,10 +427,10 @@ infoConnectivity : Bool -> Element msg
 infoConnectivity online =
     Element.paragraph []
         [ if online then
-            Element.text "Online mode will make http requests to package.elm-lang.org, use with moderation, preferably on small dependency trees. Your cache will grow (see top right corner) if new information is downloaded. PS: cache is reset on page reload."
+            Element.text "Online mode will make http requests to package.elm-lang.org, use with moderation, preferably on small dependency trees. Your cache will grow (see top right corner) if new information is downloaded. PS: cache should be kept in indexeddb on page reload."
 
           else
-            Element.text "Offline mode will never make any http request. Solving will fail if a list of dependencies of some package is required but not available in cache. PS: cache is reset on page reload."
+            Element.text "Offline mode will never make any http request. Solving will fail if a list of dependencies of some package is required but not available in cache. PS: cache should be kept in indexeddb on page reload."
         ]
 
 
