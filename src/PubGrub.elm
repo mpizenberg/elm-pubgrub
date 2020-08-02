@@ -232,8 +232,9 @@ updateEffect msg ((State { root, pgModel }) as state) =
                     solveStep root package updatedModel
 
                 Just deps ->
-                    applyDecision deps package version pgModel
-                        |> solveStep root package
+                    applyDecision root deps package version pgModel
+                        |> Result.map (solveStep root package)
+                        |> failIfErr state
 
         NoMsg ->
             ( state, NoEffect )
@@ -270,8 +271,8 @@ solveStep root package pgModel =
 {-| Update the model incompatibilities and partial solution
 with the package version we've just picked and its dependencies.
 -}
-applyDecision : List ( String, Range ) -> String -> Version -> Core.Model -> Core.Model
-applyDecision dependencies package version pgModel =
+applyDecision : String -> List ( String, Range ) -> String -> Version -> Core.Model -> Result String Core.Model
+applyDecision root dependencies package version pgModel =
     let
         depIncompats =
             Incompatibility.fromDependencies package version dependencies
@@ -286,12 +287,16 @@ applyDecision dependencies package version pgModel =
         updatedIncompatibilities =
             List.foldr Incompatibility.merge pgModel.incompatibilities depIncompats
     in
-    case PartialSolution.addVersion package version depIncompats pgModel.partialSolution of
-        Nothing ->
-            Core.setIncompatibilities updatedIncompatibilities pgModel
+    if List.any (Incompatibility.isTerminal root) depIncompats then
+        Err ("Dependencies of " ++ package ++ " at version " ++ Version.toDebugString version ++ " are incompatible with our root package")
 
-        Just updatedPartial ->
-            Core.Model updatedIncompatibilities updatedPartial
+    else
+        case PartialSolution.addVersion package version depIncompats pgModel.partialSolution of
+            Nothing ->
+                Ok (Core.setIncompatibilities updatedIncompatibilities pgModel)
+
+            Just updatedPartial ->
+                Ok (Core.Model updatedIncompatibilities updatedPartial)
 
 
 
@@ -405,8 +410,9 @@ tryUpdateCached cache stateAndEffect =
         ( State { root, pgModel }, RetrieveDependencies ( package, version ) ) ->
             case Cache.listDependencies cache package version of
                 Just deps ->
-                    applyDecision deps package version pgModel
-                        |> solveStep root package
+                    applyDecision root deps package version pgModel
+                        |> Result.map (solveStep root package)
+                        |> failIfErr (State { root = root, pgModel = pgModel })
                         |> tryUpdateCached cache
 
                 Nothing ->
@@ -414,3 +420,16 @@ tryUpdateCached cache stateAndEffect =
 
         _ ->
             stateAndEffect
+
+
+{-| If the result is an error, return the given fail state
+with the SignalEnd effect containing the error.
+-}
+failIfErr : State -> Result String ( State, Effect ) -> ( State, Effect )
+failIfErr failState result =
+    case result of
+        Ok stateAndEffect ->
+            stateAndEffect
+
+        Err err ->
+            ( failState, SignalEnd (Err err) )
