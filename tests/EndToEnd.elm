@@ -2,8 +2,13 @@ module EndToEnd exposing (..)
 
 import Examples
 import Expect
+import Fuzz
+import Minithesis as M
+import Minithesis.Fuzz as MF
 import PubGrub
+import PubGrub.Cache as Cache exposing (Cache)
 import PubGrub.Version as Version
+import PubGrubFuzz
 import Test exposing (Test)
 
 
@@ -109,3 +114,103 @@ transitiveDependencyToIncompatibleRoot =
                 "root"
                 Version.one
                 |> Expect.ok
+
+
+
+-- Fuzz tests
+
+
+correlatedDependencies : Test
+correlatedDependencies =
+    Test.fuzz Fuzz.int "correlatedDependencies" <|
+        \seed ->
+            M.run seed (solveNoUnexpected PubGrubFuzz.correlatedDependencies)
+                |> Tuple.second
+                |> Expect.equal M.Passes
+
+
+uncorrelatedDependencies : Test
+uncorrelatedDependencies =
+    Test.fuzz Fuzz.int "uncorrelatedDependencies" <|
+        \seed ->
+            M.run seed (solveNoUnexpected PubGrubFuzz.uncorrelatedDependencies)
+                |> Tuple.second
+                |> Expect.equal M.Passes
+
+
+emptyDependencies : Test
+emptyDependencies =
+    Test.fuzz Fuzz.int "emptyDependencies" <|
+        \seed ->
+            M.run seed (solveSuccess PubGrubFuzz.emptyDependencies)
+                |> Tuple.second
+                |> Expect.equal M.Passes
+
+
+
+-- Fuzz helpers
+
+
+solveNoUnexpected : MF.Fuzzer PubGrubFuzz.Dependencies -> M.Test PubGrubFuzz.Dependencies
+solveNoUnexpected depsFuzzer =
+    M.test "solveWithoutUnexpectedResult" depsFuzzer <|
+        \dependencies ->
+            let
+                config =
+                    packagesConfigFromDependencies dependencies
+            in
+            -- Try to solve dependencies for all packages.
+            -- They should all succeed.
+            List.all (\( ( p, v ), _ ) -> noUnexpected (PubGrub.solve config p v)) dependencies
+
+
+noUnexpected : Result String PubGrub.Solution -> Bool
+noUnexpected res =
+    case res of
+        Err "How did we end up with no package to choose but no solution?" ->
+            False
+
+        Err "This should never happen, rootCause is guaranted to be almost satisfied by the partial solution" ->
+            False
+
+        _ ->
+            True
+
+
+solveSuccess : MF.Fuzzer PubGrubFuzz.Dependencies -> M.Test PubGrubFuzz.Dependencies
+solveSuccess depsFuzzer =
+    M.test "solveWithOkResult" depsFuzzer <|
+        \dependencies ->
+            let
+                config =
+                    packagesConfigFromDependencies dependencies
+            in
+            -- Try to solve dependencies for all packages.
+            -- They should all succeed.
+            List.all (\( ( p, v ), _ ) -> isOk (PubGrub.solve config p v)) dependencies
+
+
+isOk : Result err value -> Bool
+isOk res =
+    case res of
+        Ok _ ->
+            True
+
+        _ ->
+            False
+
+
+packagesConfigFromDependencies : PubGrubFuzz.Dependencies -> PubGrub.PackagesConfig
+packagesConfigFromDependencies deps =
+    PubGrub.packagesConfigFromCache (cacheFromDeps deps)
+
+
+cacheFromDeps : PubGrubFuzz.Dependencies -> Cache
+cacheFromDeps dependencies =
+    List.foldl
+        (\( ( p, v ), pDeps ) cache ->
+            Cache.addPackageVersions [ ( p, v ) ] cache
+                |> Cache.addDependencies p v pDeps
+        )
+        Cache.empty
+        dependencies
