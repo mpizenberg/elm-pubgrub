@@ -118,7 +118,7 @@ import PubGrub.Version as Version exposing (Version)
 {-| Internal state of the PubGrub algorithm.
 -}
 type State
-    = State { root : String, pgModel : Core.Model }
+    = State { root : String, rootVersion : Version, pgModel : Core.Model }
 
 
 {-| Convert a state into a printable string (for human reading).
@@ -202,7 +202,7 @@ effectToString effect =
 {-| Continue solving until the next `Effect` is required.
 -}
 updateEffect : Msg -> State -> ( State, Effect )
-updateEffect msg ((State { root, pgModel }) as state) =
+updateEffect msg ((State { root, rootVersion, pgModel }) as state) =
     case msg of
         AvailableVersions package term versions ->
             case Core.pickVersion versions term of
@@ -217,7 +217,7 @@ updateEffect msg ((State { root, pgModel }) as state) =
                         updatedModel =
                             Core.mapIncompatibilities (Incompatibility.merge noVersionIncompat) pgModel
                     in
-                    solveStep root package updatedModel
+                    solveStep ( root, rootVersion ) package updatedModel
 
         PackageDependencies package version maybeDependencies ->
             case maybeDependencies of
@@ -229,11 +229,12 @@ updateEffect msg ((State { root, pgModel }) as state) =
                         updatedModel =
                             Core.mapIncompatibilities (Incompatibility.merge unavailableDepsIncompat) pgModel
                     in
-                    solveStep root package updatedModel
+                    solveStep ( root, rootVersion ) package updatedModel
 
                 Just deps ->
-                    applyDecision deps package version pgModel
-                        |> solveStep root package
+                    applyDecision ( root, rootVersion ) deps package version pgModel
+                        |> Result.map (solveStep ( root, rootVersion ) package)
+                        |> failIfErr state
 
         NoMsg ->
             ( state, NoEffect )
@@ -245,33 +246,39 @@ It will either terminate (SignalEnd effect)
 or ask for the list of versions of a given package (ListVersions effect).
 
 -}
-solveStep : String -> String -> Core.Model -> ( State, Effect )
-solveStep root package pgModel =
-    case Core.unitPropagation root package pgModel of
+solveStep : ( String, Version ) -> String -> Core.Model -> ( State, Effect )
+solveStep ( root, rootVersion ) package pgModel =
+    case Core.unitPropagation ( root, rootVersion ) package pgModel of
         Err msg ->
-            ( State { root = root, pgModel = pgModel }, SignalEnd (Err msg) )
+            ( State { root = root, rootVersion = rootVersion, pgModel = pgModel }
+            , SignalEnd (Err msg)
+            )
 
         Ok updatedModel ->
             case Core.pickPackage updatedModel.partialSolution of
                 Nothing ->
                     case PartialSolution.solution updatedModel.partialSolution of
                         Just solution ->
-                            ( State { root = root, pgModel = updatedModel }, SignalEnd (Ok solution) )
+                            ( State { root = root, rootVersion = rootVersion, pgModel = updatedModel }
+                            , SignalEnd (Ok solution)
+                            )
 
                         Nothing ->
-                            ( State { root = root, pgModel = updatedModel }
+                            ( State { root = root, rootVersion = rootVersion, pgModel = updatedModel }
                             , SignalEnd (Err "How did we end up with no package to choose but no solution?")
                             )
 
                 Just packageAndTerm ->
-                    ( State { root = root, pgModel = updatedModel }, ListVersions packageAndTerm )
+                    ( State { root = root, rootVersion = rootVersion, pgModel = updatedModel }
+                    , ListVersions packageAndTerm
+                    )
 
 
 {-| Update the model incompatibilities and partial solution
 with the package version we've just picked and its dependencies.
 -}
-applyDecision : List ( String, Range ) -> String -> Version -> Core.Model -> Core.Model
-applyDecision dependencies package version pgModel =
+applyDecision : ( String, Version ) -> List ( String, Range ) -> String -> Version -> Core.Model -> Result String Core.Model
+applyDecision ( root, rootVersion ) dependencies package version pgModel =
     let
         depIncompats =
             Incompatibility.fromDependencies package version dependencies
@@ -286,12 +293,16 @@ applyDecision dependencies package version pgModel =
         updatedIncompatibilities =
             List.foldr Incompatibility.merge pgModel.incompatibilities depIncompats
     in
-    case PartialSolution.addVersion package version depIncompats pgModel.partialSolution of
-        Nothing ->
-            Core.setIncompatibilities updatedIncompatibilities pgModel
+    if List.any (Incompatibility.isTerminal root rootVersion) depIncompats then
+        Err ("Dependencies of " ++ package ++ " at version " ++ Version.toDebugString version ++ " are incompatible with our root package")
 
-        Just updatedPartial ->
-            Core.Model updatedIncompatibilities updatedPartial
+    else
+        case PartialSolution.addVersion package version depIncompats pgModel.partialSolution of
+            Nothing ->
+                Ok (Core.setIncompatibilities updatedIncompatibilities pgModel)
+
+            Just updatedPartial ->
+                Ok (Core.Model updatedIncompatibilities updatedPartial)
 
 
 
@@ -328,7 +339,7 @@ packagesConfigFromCache cache =
 -}
 solve : PackagesConfig -> String -> Version -> Result String Solution
 solve config root version =
-    solveStep root root (Core.init root version)
+    solveStep ( root, version ) root (Core.init root version)
         |> updateUntilFinished config
 
 
@@ -373,7 +384,7 @@ performSync config effect =
 -}
 init : Cache -> String -> Version -> ( State, Effect )
 init cache root version =
-    solveStep root root (Core.init root version)
+    solveStep ( root, version ) root (Core.init root version)
         |> tryUpdateCached cache
 
 
@@ -402,11 +413,12 @@ Otherwise, just emit the effect.
 tryUpdateCached : Cache -> ( State, Effect ) -> ( State, Effect )
 tryUpdateCached cache stateAndEffect =
     case stateAndEffect of
-        ( State { root, pgModel }, RetrieveDependencies ( package, version ) ) ->
+        ( State { root, rootVersion, pgModel }, RetrieveDependencies ( package, version ) ) ->
             case Cache.listDependencies cache package version of
                 Just deps ->
-                    applyDecision deps package version pgModel
-                        |> solveStep root package
+                    applyDecision ( root, rootVersion ) deps package version pgModel
+                        |> Result.map (solveStep ( root, rootVersion ) package)
+                        |> failIfErr (State { root = root, rootVersion = rootVersion, pgModel = pgModel })
                         |> tryUpdateCached cache
 
                 Nothing ->
@@ -414,3 +426,16 @@ tryUpdateCached cache stateAndEffect =
 
         _ ->
             stateAndEffect
+
+
+{-| If the result is an error, return the given fail state
+with the SignalEnd effect containing the error.
+-}
+failIfErr : State -> Result String ( State, Effect ) -> ( State, Effect )
+failIfErr failState result =
+    case result of
+        Ok stateAndEffect ->
+            stateAndEffect
+
+        Err err ->
+            ( failState, SignalEnd (Err err) )

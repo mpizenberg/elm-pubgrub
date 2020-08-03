@@ -133,13 +133,13 @@ pickVersion availableVersions partialSolutionTerm =
 
 {-| Unit propagation is the core mechanism of the solving algorithm.
 -}
-unitPropagation : String -> String -> Model -> Result String Model
-unitPropagation root package model =
-    unitPropagationLoop root "" [ package ] [] model
+unitPropagation : ( String, Version ) -> String -> Model -> Result String Model
+unitPropagation ( root, rootVersion ) package model =
+    unitPropagationLoop ( root, rootVersion ) "" [ package ] [] model
 
 
-unitPropagationLoop : String -> String -> List String -> List Incompatibility -> Model -> Result String Model
-unitPropagationLoop root package changed loopIncompatibilities model =
+unitPropagationLoop : ( String, Version ) -> String -> List String -> List Incompatibility -> Model -> Result String Model
+unitPropagationLoop ( root, rootVersion ) package changed loopIncompatibilities model =
     case loopIncompatibilities of
         [] ->
             case changed of
@@ -147,13 +147,13 @@ unitPropagationLoop root package changed loopIncompatibilities model =
                     Ok model
 
                 pack :: othersChanged ->
-                    unitPropagationLoop root pack othersChanged model.incompatibilities model
+                    unitPropagationLoop ( root, rootVersion ) pack othersChanged model.incompatibilities model
 
         incompat :: othersIncompat ->
             if Dict.member package (Incompatibility.asDict incompat) then
                 case PartialSolution.relation incompat model.partialSolution of
                     Incompatibility.Satisfies ->
-                        case conflictResolution False root incompat model of
+                        case conflictResolution False ( root, rootVersion ) incompat model of
                             Err msg ->
                                 Err msg
 
@@ -168,7 +168,7 @@ unitPropagationLoop root package changed loopIncompatibilities model =
                                         in
                                         -- Replace changed with a set containing only term's package name.
                                         -- Would love to use the |> syntax if it would not break tail call optimization (TCO).
-                                        unitPropagationLoop root package [ name ] othersIncompat updatedAgainModel
+                                        unitPropagationLoop ( root, rootVersion ) package [ name ] othersIncompat updatedAgainModel
 
                                     _ ->
                                         Err "This should never happen, rootCause is guaranted to be almost satisfied by the partial solution"
@@ -180,20 +180,20 @@ unitPropagationLoop root package changed loopIncompatibilities model =
                                 mapPartialSolution (PartialSolution.prependDerivation name (Term.negate term) incompat) model
                         in
                         -- Would love to use the |> syntax if it didn't break TCO.
-                        unitPropagationLoop root package (name :: changed) othersIncompat updatedModel
+                        unitPropagationLoop ( root, rootVersion ) package (name :: changed) othersIncompat updatedModel
 
                     _ ->
-                        unitPropagationLoop root package changed othersIncompat model
+                        unitPropagationLoop ( root, rootVersion ) package changed othersIncompat model
 
             else
-                unitPropagationLoop root package changed othersIncompat model
+                unitPropagationLoop ( root, rootVersion ) package changed othersIncompat model
 
 
 {-| Return the root cause and the backtracked model.
 -}
-conflictResolution : Bool -> String -> Incompatibility -> Model -> Result String ( Incompatibility, Model )
-conflictResolution incompatChanged root incompat model =
-    if Incompatibility.isTerminal root incompat then
+conflictResolution : Bool -> ( String, Version ) -> Incompatibility -> Model -> Result String ( Incompatibility, Model )
+conflictResolution incompatChanged ( root, rootVersion ) incompat model =
+    if Incompatibility.isTerminal root rootVersion incompat then
         let
             _ =
                 Debug.log ("Final incompatibility:\n" ++ Incompatibility.toDebugString -1 3 incompat) ""
@@ -264,7 +264,7 @@ conflictResolution incompatChanged root incompat model =
                         _ =
                             Debug.log ("   priorCause\n" ++ Incompatibility.toDebugString -1 3 priorCause) ""
                     in
-                    conflictResolution True root priorCause model
+                    conflictResolution True ( root, rootVersion ) priorCause model
 
 
 backtrack : Bool -> Int -> Incompatibility -> Model -> Model

@@ -209,14 +209,15 @@ termsString terms =
 {-| Check if an incompatibility should mark the end of the algorithm
 because of an issue.
 -}
-isTerminal : String -> Incompatibility -> Bool
-isTerminal rootPackage (Incompatibility incompat _) =
+isTerminal : String -> Version -> Incompatibility -> Bool
+isTerminal rootPackage version (Incompatibility incompat _) =
     case incompat.asList of
         [] ->
             True
 
-        ( package, Term.Positive _ ) :: [] ->
-            package == rootPackage
+        ( package, term ) :: [] ->
+            (package == rootPackage)
+                && Term.acceptVersionJust version term
 
         _ ->
             False
@@ -237,12 +238,10 @@ fromDependencies package version dependencies =
 
 fromDependency : String -> Version -> ( String, Range ) -> Incompatibility
 fromDependency package version ( depPackage, depRange ) =
-    let
-        term =
-            Term.Positive (Range.exact version)
-    in
-    singleton package term (FromDependencyOf package version)
-        |> insert depPackage (Term.Negative depRange)
+    union
+        (Dict.singleton package (Term.Positive (Range.exact version)))
+        (Dict.singleton depPackage (Term.Negative depRange))
+        (FromDependencyOf package version)
 
 
 {-| Add incompatibilities obtained from dependencies in to the set of incompatibilities.
@@ -282,10 +281,18 @@ priorCause ((Incompatibility cause _) as i1) ((Incompatibility incompat _) as i2
 -}
 union : Dict String Term -> Dict String Term -> Kind -> Incompatibility
 union i1 i2 kind =
-    Dict.merge insert fuse insert i1 i2 (empty kind)
+    let
+        incompatDict =
+            Dict.merge Dict.insert fuse Dict.insert i1 i2 Dict.empty
+    in
+    Incompatibility
+        { asDict = incompatDict
+        , asList = Dict.toList incompatDict
+        }
+        kind
 
 
-fuse : String -> Term -> Term -> Incompatibility -> Incompatibility
+fuse : String -> Term -> Term -> Dict String Term -> Dict String Term
 fuse name t1 t2 incompatibility =
     let
         termUnion =
@@ -295,19 +302,7 @@ fuse name t1 t2 incompatibility =
         incompatibility
 
     else
-        insert name termUnion incompatibility
-
-
-{-| Insert a new package term inside an incompatibility.
-Use ONLY if guaranted that the package name is not already in the incompatibility.
--}
-insert : String -> Term -> Incompatibility -> Incompatibility
-insert name term (Incompatibility incompat kind) =
-    Incompatibility
-        { asDict = Dict.insert name term incompat.asDict
-        , asList = ( name, term ) :: incompat.asList
-        }
-        kind
+        Dict.insert name termUnion incompatibility
 
 
 {-| We say that a set of terms S satisfies an incompatibility I
