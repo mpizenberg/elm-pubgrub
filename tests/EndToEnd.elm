@@ -124,7 +124,8 @@ correlatedDependencies : Test
 correlatedDependencies =
     Test.fuzz Fuzz.int "correlatedDependencies" <|
         \seed ->
-            M.run seed (solveNoUnexpected PubGrubFuzz.correlatedDependencies)
+            -- Change maxExamples to augment the number of tests
+            M.runWith { maxExamples = 100, showShrinkHistory = False } seed (solveNoUnexpected PubGrubFuzz.correlatedDependencies)
                 |> Tuple.second
                 |> Expect.equal M.Passes
 
