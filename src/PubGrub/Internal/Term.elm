@@ -196,8 +196,8 @@ intersection t1 t2 =
 
 
 {-| Compute the union of two terms.
-If at least one term is positive,
-the union is a positive term.
+If at least one term is negative,
+the union is a negative term.
 -}
 union : Term -> Term -> Term
 union t1 t2 =
