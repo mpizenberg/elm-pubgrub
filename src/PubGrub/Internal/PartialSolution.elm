@@ -39,6 +39,7 @@ import PubGrub.Internal.Assignment as Assignment exposing (Assignment)
 import PubGrub.Internal.Incompatibility as Incompatibility exposing (Incompatibility, Relation)
 import PubGrub.Internal.Memory as Memory exposing (Memory)
 import PubGrub.Internal.Term as Term exposing (Term)
+import PubGrub.Range as Range exposing (Range)
 import PubGrub.Version as Version exposing (Version)
 import Utils exposing (SearchDecision(..))
 
@@ -63,7 +64,7 @@ type PartialSolution
 -}
 empty : PartialSolution
 empty =
-    PartialSolution []
+    PartialSolution [] Dict.empty
 
 
 fromAssignements : List Assignment -> PartialSolution
@@ -228,13 +229,25 @@ Also returns all assignments earlier than the satisfier.
 We call the term in the incompatibility that refers to the same package "term".
 -}
 findSatisfier : Incompatibility -> PartialSolution -> ( Assignment, PartialSolution, Term )
-findSatisfier incompat (PartialSolution partial) =
-    case Utils.find (searchSatisfier incompat Memory.addAssignment) partial of
-        Just x ->
-            x
+findSatisfier incompat (PartialSolution partial _) =
+    if List.isEmpty partial then
+        Debug.todo "We should never call findSatisfier with an empty partial solution"
 
-        Nothing ->
-            Debug.todo "should always find something"
+    else
+        let
+            incompatDict =
+                Incompatibility.asDict incompat
+
+            accumSatisfier =
+                Dict.map (\_ _ -> ( False, Term.Negative Range.none )) incompatDict
+        in
+        case findSatisfierHelper incompatDict accumSatisfier [] (List.reverse partial) of
+            -- Not using Maybe.withDefault because Debug.todo crashes
+            Nothing ->
+                Debug.todo "Should always find a satisfier right?"
+
+            Just value ->
+                value
 
 
 {-| Earliest assignment in the partial solution before satisfier
@@ -242,50 +255,84 @@ such that incompatibility is satisfied by the partial solution up to
 and including that assignment plus satisfier.
 -}
 findPreviousSatisfier : Assignment -> Incompatibility -> PartialSolution -> Maybe ( Assignment, PartialSolution, Term )
-findPreviousSatisfier satisfier incompat (PartialSolution earlierPartial) =
+findPreviousSatisfier satisfier incompat (PartialSolution earlierPartial _) =
     let
-        buildMemory assignment earlierMemory =
-            Memory.addAssignment satisfier (Memory.addAssignment assignment earlierMemory)
+        incompatDict =
+            Incompatibility.asDict incompat
+
+        incompatSatisfierTerm =
+            case Dict.get satisfier.package incompatDict of
+                -- Not using Maybe.withDefault because Debug.todo crashes
+                Nothing ->
+                    Debug.todo "shoud exist"
+
+                Just t ->
+                    t
+
+        satisfierTerm =
+            Assignment.getTerm satisfier.kind
+
+        accumSatisfier =
+            Dict.map (\_ _ -> ( False, Term.Negative Range.none )) incompatDict
+                |> Dict.insert satisfier.package
+                    ( satisfierTerm |> Term.subsetOf incompatSatisfierTerm
+                    , satisfierTerm
+                    )
     in
-    Utils.find (searchSatisfier incompat buildMemory) earlierPartial
+    findSatisfierHelper incompatDict accumSatisfier [] (List.reverse earlierPartial)
 
 
-searchSatisfier : Incompatibility -> (Assignment -> Memory -> Memory) -> { left : Int, right : Int } -> ( Assignment, Memory ) -> List ( Assignment, Memory ) -> SearchDecision ( Assignment, PartialSolution, Term )
-searchSatisfier incompat buildMemory { left, right } ( assignment, _ ) earlier =
-    let
-        earlierMemory =
-            List.head earlier
-                |> Maybe.map Tuple.second
-                |> Maybe.withDefault Dict.empty
+{-| Iterate over the assignments (oldest must be first)
+until we find the first one such that the set of all assignments until this one
+satisfies the given incompatibility.
+-}
+findSatisfierHelper : Dict String Term -> Dict String ( Bool, Term ) -> List Assignment -> List Assignment -> Maybe ( Assignment, PartialSolution, Term )
+findSatisfierHelper incompat accumSatisfier accumAssignments newAssignments =
+    case newAssignments of
+        [] ->
+            Nothing
 
-        memory =
-            buildMemory assignment earlierMemory
-    in
-    case Incompatibility.relation (Memory.terms memory) incompat of
-        -- if it satisfies, search right (earlier assignments)
-        Incompatibility.Satisfies ->
-            if right == 0 then
-                case Dict.get assignment.package (Incompatibility.asDict incompat) of
-                    Just term ->
-                        Found
-                            ( assignment
-                            , PartialSolution earlier
-                            , term
-                            )
+        assignment :: otherAssignments ->
+            case Dict.get assignment.package incompat of
+                Nothing ->
+                    -- We don't care of that assignment if its corresponding package is not in the incompatibility.
+                    findSatisfierHelper incompat accumSatisfier (assignment :: accumAssignments) otherAssignments
 
-                    Nothing ->
-                        Stop
+                Just incompatTerm ->
+                    -- If that package corresponds to a package in the incompatibility
+                    -- check if it is satisfied with the new assignment.
+                    case Dict.get assignment.package accumSatisfier of
+                        Nothing ->
+                            Debug.todo "A key in incompat should always exist in accumAssignments"
 
-            else
-                KeepGoRight (max 1 (right // 2))
+                        Just ( True, _ ) ->
+                            -- package term is already satisfied, no need to check
+                            findSatisfierHelper incompat accumSatisfier (assignment :: accumAssignments) otherAssignments
 
-        -- if it does not satisfy, search left (later assignments)
-        _ ->
-            if left == 0 then
-                Stop
+                        Just ( False, accumTerm ) ->
+                            -- check if the addition of the new term helps satisfying
+                            let
+                                newAccumTerm =
+                                    Term.intersection (Assignment.getTerm assignment.kind) accumTerm
 
-            else
-                GoLeft (max 1 (left // 2))
+                                termSatisfied =
+                                    newAccumTerm
+                                        |> Term.subsetOf incompatTerm
+
+                                newAccumSatisfier =
+                                    Dict.insert assignment.package ( termSatisfied, newAccumTerm ) accumSatisfier
+
+                                foundSatisfier =
+                                    Utils.dictAll (\_ ( satisfied, _ ) -> satisfied) newAccumSatisfier
+
+                                newAccumAssignment =
+                                    assignment :: accumAssignments
+                            in
+                            if foundSatisfier then
+                                Just ( assignment, fromAssignements newAccumAssignment, incompatTerm )
+
+                            else
+                                findSatisfierHelper incompat newAccumSatisfier newAccumAssignment otherAssignments
 
 
 

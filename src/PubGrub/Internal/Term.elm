@@ -1,7 +1,7 @@
 module PubGrub.Internal.Term exposing
     ( Term(..), isPositive, negate, toDebugString
     , acceptVersion, acceptVersionJust
-    , intersection, union, listIntersection
+    , intersection, union, listIntersection, subsetOf
     , Relation(..), satisfies, contradicts, relation
     )
 
@@ -16,7 +16,7 @@ This module exposes types and functions to deal with terms.
 
 # Set operations with terms
 
-@docs intersection, union, listIntersection
+@docs intersection, union, listIntersection, subsetOf
 
 
 # Relation between terms
@@ -170,6 +170,8 @@ satisfies term set =
     subsetOf term (listIntersection Nothing set)
 
 
+{-| Check if t2 is a subset of t1.
+-}
 subsetOf : Term -> Term -> Bool
 subsetOf t1 t2 =
     t2 == intersection t1 t2
