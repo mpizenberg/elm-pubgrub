@@ -56,7 +56,7 @@ It could be fun to benchmark to check that it is actually useful.
 
 -}
 type PartialSolution
-    = PartialSolution (List ( Assignment, Memory ))
+    = PartialSolution (List Assignment) Memory
 
 
 {-| Initialization of a partial solution.
@@ -64,6 +64,12 @@ type PartialSolution
 empty : PartialSolution
 empty =
     PartialSolution []
+
+
+fromAssignements : List Assignment -> PartialSolution
+fromAssignements assignments =
+    PartialSolution assignments
+        (List.foldl Memory.addAssignment Dict.empty assignments)
 
 
 
@@ -79,8 +85,8 @@ toDebugString partial =
 
 
 encode : PartialSolution -> Value
-encode (PartialSolution partial) =
-    Json.Encode.list (Assignment.encodeDebug << Tuple.first) partial
+encode (PartialSolution partial _) =
+    Json.Encode.list Assignment.encodeDebug partial
 
 
 
@@ -95,13 +101,8 @@ and if it contains at least one positive derivation term
 in the partial solution.
 -}
 potentialPackages : PartialSolution -> Dict String (List Term)
-potentialPackages (PartialSolution partial) =
-    case partial of
-        [] ->
-            Dict.empty
-
-        ( _, memory ) :: _ ->
-            Memory.potentialPackages memory
+potentialPackages (PartialSolution _ memory) =
+    Memory.potentialPackages memory
 
 
 {-| We can add the version to the partial solution as a decision
@@ -124,50 +125,40 @@ addVersion package version newIncompatibilities partial =
 
 
 doesNotSatisfy : List Incompatibility -> PartialSolution -> Bool
-doesNotSatisfy newIncompatibilities (PartialSolution partial) =
-    case ( newIncompatibilities, partial ) of
-        ( _, [] ) ->
+doesNotSatisfy newIncompatibilities ((PartialSolution _ memory) as partial) =
+    case newIncompatibilities of
+        [] ->
             True
 
-        ( [], _ ) ->
-            True
-
-        ( incompat :: others, ( _, memory ) :: _ ) ->
+        incompat :: others ->
             case Incompatibility.relation (Memory.terms memory) incompat of
                 Incompatibility.Satisfies ->
                     False
 
                 _ ->
-                    doesNotSatisfy others (PartialSolution partial)
+                    doesNotSatisfy others partial
 
 
 {-| Check if the terms in the partial solution
 satisfy the incompatibility.
 -}
 relation : Incompatibility -> PartialSolution -> Relation
-relation incompatibility (PartialSolution partial) =
-    case partial of
-        [] ->
-            Incompatibility.relation Dict.empty incompatibility
-
-        ( _, memory ) :: _ ->
-            Incompatibility.relation (Memory.terms memory) incompatibility
+relation incompatibility (PartialSolution _ memory) =
+    Incompatibility.relation (Memory.terms memory) incompatibility
 
 
 {-| Prepend a decision (a package with a version)
 to the partial solution.
 -}
 prependDecision : String -> Version -> PartialSolution -> PartialSolution
-prependDecision package version (PartialSolution partial) =
+prependDecision package version (PartialSolution partial memory) =
     case partial of
         [] ->
             PartialSolution
-                [ ( Assignment.newDecision package version 0
-                  , Dict.singleton package { decision = Just version, derivations = [] }
-                  )
-                ]
+                [ Assignment.newDecision package version 0 ]
+                (Dict.singleton package { decision = Just version, derivations = [] })
 
-        ( { decisionLevel }, memory ) :: _ ->
+        { decisionLevel } :: _ ->
             let
                 _ =
                     Debug.log ("Decision level " ++ String.fromInt (decisionLevel + 1) ++ " : " ++ package ++ " : " ++ Version.toDebugString version) ""
@@ -178,23 +169,21 @@ prependDecision package version (PartialSolution partial) =
                 newMemory =
                     Memory.addDecision package version memory
             in
-            PartialSolution (( decision, newMemory ) :: partial)
+            PartialSolution (decision :: partial) newMemory
 
 
 {-| Prepend a package derivation term to the partial solution.
 Also includes its cause.
 -}
 prependDerivation : String -> Term -> Incompatibility -> PartialSolution -> PartialSolution
-prependDerivation package term cause (PartialSolution partial) =
+prependDerivation package term cause (PartialSolution partial memory) =
     case partial of
         [] ->
             PartialSolution
-                [ ( Assignment.newDerivation package term 0 cause
-                  , Dict.singleton package { decision = Nothing, derivations = [ term ] }
-                  )
-                ]
+                [ Assignment.newDerivation package term 0 cause ]
+                (Dict.singleton package { decision = Nothing, derivations = [ term ] })
 
-        ( { decisionLevel }, memory ) :: _ ->
+        { decisionLevel } :: _ ->
             let
                 _ =
                     Debug.log ("Derivation : " ++ package ++ " : " ++ Term.toDebugString term) ""
@@ -205,32 +194,32 @@ prependDerivation package term cause (PartialSolution partial) =
                 newMemory =
                     Memory.addDerivation package term memory
             in
-            PartialSolution (( derivation, newMemory ) :: partial)
+            PartialSolution (derivation :: partial) newMemory
 
 
 {-| Backtrack the partial solution to a given decision level.
 -}
 backtrack : Int -> PartialSolution -> PartialSolution
-backtrack level (PartialSolution partial) =
+backtrack level (PartialSolution partial _) =
     let
         _ =
             Debug.log "backtrack to level" level
     in
-    PartialSolution (dropUntilLevel level partial)
+    fromAssignements (dropUntilLevel level partial)
 
 
-dropUntilLevel : Int -> List ( Assignment, m ) -> List ( Assignment, m )
-dropUntilLevel level partial =
-    case partial of
+dropUntilLevel : Int -> List Assignment -> List Assignment
+dropUntilLevel level assignments =
+    case assignments of
         [] ->
             []
 
-        ( { decisionLevel }, _ ) :: others ->
+        { decisionLevel } :: others ->
             if decisionLevel > level then
                 dropUntilLevel level others
 
             else
-                partial
+                assignments
 
 
 {-| A satisfier is the earliest assignment in partial solution such that the incompatibility
@@ -308,10 +297,5 @@ a corresponding decision that satisfies that assignment,
 it's a total solution and version solving has succeeded.
 -}
 solution : PartialSolution -> Maybe (List ( String, Version ))
-solution (PartialSolution partial) =
-    case partial of
-        [] ->
-            Just []
-
-        ( _, memory ) :: _ ->
-            Memory.solution memory
+solution (PartialSolution _ memory) =
+    Memory.solution memory
