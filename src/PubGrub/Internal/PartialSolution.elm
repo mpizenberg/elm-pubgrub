@@ -39,9 +39,9 @@ import PubGrub.Internal.Assignment as Assignment exposing (Assignment)
 import PubGrub.Internal.Incompatibility as Incompatibility exposing (Incompatibility, Relation)
 import PubGrub.Internal.Memory as Memory exposing (Memory)
 import PubGrub.Internal.Term as Term exposing (Term)
-import PubGrub.Range as Range exposing (Range)
+import PubGrub.Range as Range
 import PubGrub.Version as Version exposing (Version)
-import Utils exposing (SearchDecision(..))
+import Utils
 
 
 {-| The partial solution is the current state of our solution.
