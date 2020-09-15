@@ -292,22 +292,22 @@ findSatisfierHelper incompat accumSatisfier accumAssignments newAssignments =
         [] ->
             Nothing
 
-        assignment :: otherAssignments ->
+        assignment :: newerAssignments ->
             case Dict.get assignment.package incompat of
                 Nothing ->
                     -- We don't care of that assignment if its corresponding package is not in the incompatibility.
-                    findSatisfierHelper incompat accumSatisfier (assignment :: accumAssignments) otherAssignments
+                    findSatisfierHelper incompat accumSatisfier (assignment :: accumAssignments) newerAssignments
 
                 Just incompatTerm ->
                     -- If that package corresponds to a package in the incompatibility
                     -- check if it is satisfied with the new assignment.
                     case Dict.get assignment.package accumSatisfier of
                         Nothing ->
-                            Debug.todo "A key in incompat should always exist in accumAssignments"
+                            Debug.todo "A key in incompat should always exist in accumSatisfier"
 
                         Just ( True, _ ) ->
                             -- package term is already satisfied, no need to check
-                            findSatisfierHelper incompat accumSatisfier (assignment :: accumAssignments) otherAssignments
+                            findSatisfierHelper incompat accumSatisfier (assignment :: accumAssignments) newerAssignments
 
                         Just ( False, accumTerm ) ->
                             -- check if the addition of the new term helps satisfying
@@ -325,14 +325,14 @@ findSatisfierHelper incompat accumSatisfier accumAssignments newAssignments =
                                 foundSatisfier =
                                     Utils.dictAll (\_ ( satisfied, _ ) -> satisfied) newAccumSatisfier
 
-                                newAccumAssignment =
+                                newAccumAssignments =
                                     assignment :: accumAssignments
                             in
                             if foundSatisfier then
-                                Just ( assignment, fromAssignements newAccumAssignment, incompatTerm )
+                                Just ( assignment, fromAssignements accumAssignments, incompatTerm )
 
                             else
-                                findSatisfierHelper incompat newAccumSatisfier newAccumAssignment otherAssignments
+                                findSatisfierHelper incompat newAccumSatisfier newAccumAssignments newerAssignments
 
 
 
