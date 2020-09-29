@@ -33,7 +33,7 @@ import PubGrub.Internal.Assignment as Assignment exposing (Assignment)
 import PubGrub.Internal.Term as Term exposing (Term)
 import PubGrub.Range as Range
 import PubGrub.Version exposing (Version)
-import Utils exposing (SearchDecision(..))
+import Utils
 
 
 {-| Memory is the set of all assignments previous to (including)
