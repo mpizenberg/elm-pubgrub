@@ -39,7 +39,7 @@ packageVersionFromString str =
 -- Preloaded history
 
 
-{-| List of all packages exisiting the last time the following command was used:
+{-| List of all packages existing the last time the following command was used:
 
     curl -L https://package.elm-lang.org/all-packages | jq . > history.json
 

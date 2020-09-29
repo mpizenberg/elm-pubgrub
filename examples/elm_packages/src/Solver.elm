@@ -27,7 +27,7 @@ port saveDependencies : Value -> Cmd msg
 {-| State of the solver.
 
 The Finished variant indicates that the solver has ended,
-either with a successfull list of dependencies (PubGrub.Solution)
+either with a successful list of dependencies (PubGrub.Solution)
 or with an error message.
 
 The Solving and ProjectSolving variants serve the same role.

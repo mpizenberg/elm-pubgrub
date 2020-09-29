@@ -7,7 +7,7 @@ It consists in efficiently finding a set of packages and versions
 that satisfy all the constraints of a given project dependencies.
 In addition, when that is not possible,
 PubGrub tries to provide a very human-readable and clear
-explaination as to why that failed.
+explanation as to why that failed.
 Below is an example of explanation present in
 the introductory blog post about PubGrub
 (elm-pubgrub is almost there ^^).
@@ -28,14 +28,14 @@ So, because root depends on both menu >=1.0.0 and intl >=5.0.0,
 ```
 
 The algorithm is generic and works for any type of dependency system
-with the following caracteristics, not only Elm packages.
+with the following characteristics, not only Elm packages.
 
  - Versions use the semantic versioning scheme (Major.Minor.Patch).
  - Packages cannot be simultaneously present at two different versions.
  - Dependencies are expressed in one of the following forms
    - exact version (`foo 1.0.0 depends bar 1.0.0`)
    - higher or equal version (`foo 1.0.0 depends on bar >= 1.0.0`)
-   - stricly lower version (`foo 1.0.0 depends on bar < 2.0.0`)
+   - strictly lower version (`foo 1.0.0 depends on bar < 2.0.0`)
    - ranges of versions (`foo 1.0.0 depends on bar 1.0.0 <= v < 2.0.0`)
 
 PS: at publication, modules in the `PubGrub.Internal` namespace will not be exposed.
@@ -117,7 +117,7 @@ An introductory blog post was
 
 The detailed explanation of the algorithm is
 [provided on GitHub][github-pubgrub].
-The foundation of the algorithm is based on ASP (Answer Set Programming)
+The foundation of the algorithm is based on ASP (Answer Set Programming),
 and a book called
 "[Answer Set Solving in Practice][potassco-book]"
 by Martin Gebser, Roland Kaminski, Benjamin Kaufmann and Torsten Schaub.

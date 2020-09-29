@@ -241,7 +241,7 @@ intersectionHelper accum left right =
                 intersectionHelper accum ls right
 
             else if not (Version.lowerThan r2 l1) then
-                -- Intervals are disjoint since r22 <= l1
+                -- Intervals are disjoint since r2 <= l1
                 intersectionHelper accum left rs
 
             else
