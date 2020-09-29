@@ -158,7 +158,7 @@ unitPropagationLoop ( root, rootVersion ) package changed loopIncompatibilities 
                                 Err msg
 
                             Ok ( rootCause, updatedModel ) ->
-                                -- rootCause is guaranted to be almost satisfied by the partial solution
+                                -- rootCause is guaranteed to be almost satisfied by the partial solution
                                 case PartialSolution.relation rootCause updatedModel.partialSolution of
                                     Incompatibility.AlmostSatisfies name term ->
                                         let
@@ -171,7 +171,7 @@ unitPropagationLoop ( root, rootVersion ) package changed loopIncompatibilities 
                                         unitPropagationLoop ( root, rootVersion ) package [ name ] othersIncompat updatedAgainModel
 
                                     _ ->
-                                        Err "This should never happen, rootCause is guaranted to be almost satisfied by the partial solution"
+                                        Err "This should never happen, rootCause is guaranteed to be almost satisfied by the partial solution"
 
                     Incompatibility.AlmostSatisfies name term ->
                         let

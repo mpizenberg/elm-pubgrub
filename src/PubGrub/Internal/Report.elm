@@ -15,7 +15,7 @@ Some remarks related to the algorithms below.
 We give a ref number to a line either:
 
   - because the second branch is also long
-  - or because it causes two or more derived incompats
+  - or because it causes two or more derived incompatibilities
 
 A derived can only "already" have a line number ref
 if it is one that causes two or more derived incompatibilities.
@@ -42,7 +42,7 @@ type Tree
 {-| External incompatibilities are of different kinds.
 It may be that no version exist in a given range,
 or the dependencies of a given package are not available,
-or simply, it may traduct a package dependency.
+or simply, it may track a package dependency.
 -}
 type Kind
     = NoVersion

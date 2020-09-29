@@ -171,7 +171,7 @@ noUnexpected res =
         Err "How did we end up with no package to choose but no solution?" ->
             False
 
-        Err "This should never happen, rootCause is guaranted to be almost satisfied by the partial solution" ->
+        Err "This should never happen, rootCause is guaranteed to be almost satisfied by the partial solution" ->
             False
 
         _ ->

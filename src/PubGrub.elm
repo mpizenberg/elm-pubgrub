@@ -11,7 +11,7 @@ It consists in efficiently finding a set of packages and versions
 that satisfy all the constraints of a given project dependencies.
 In addition, when that is not possible,
 PubGrub tries to provide a very human-readable and clear
-explaination as to why that failed.
+explanation as to why that failed.
 Below is an example of explanation present in
 the introductory blog post about PubGrub
 (elm-pubgrub is almost there ^^).
@@ -32,14 +32,14 @@ So, because root depends on both menu >=1.0.0 and intl >=5.0.0,
 ```
 
 The algorithm is generic and works for any type of dependency system
-with the following caracteristics, not only Elm packages.
+with the following characteristics, not only Elm packages.
 
   - Versions use the semantic versioning scheme (Major.Minor.Patch).
   - Packages cannot be simultaneously present at two different versions.
   - Dependencies are expressed in one of the following forms
       - exact version (`foo 1.0.0 depends bar 1.0.0`)
       - higher or equal version (`foo 1.0.0 depends on bar >= 1.0.0`)
-      - stricly lower version (`foo 1.0.0 depends on bar < 2.0.0`)
+      - strictly lower version (`foo 1.0.0 depends on bar < 2.0.0`)
       - ranges of versions (`foo 1.0.0 depends on bar 1.0.0 <= v < 2.0.0`)
 
 
@@ -193,7 +193,7 @@ effectToString effect =
         SignalEnd result ->
             case result of
                 Ok _ ->
-                    "Solving terminated succesfully"
+                    "Solving terminated successfully"
 
                 Err _ ->
                     "Solving terminated with an error"
@@ -391,7 +391,7 @@ init cache root version =
 {-| Update the state of the PubGrub algorithm.
 
 For messages of the `AvailableVersions` variant,
-it is the caller responsability to order the versions in the list
+it is the caller responsibility to order the versions in the list
 with preferred versions at the beginning of the list.
 As such, it is easy to try to pick the newest versions compatible
 by ordering the versions with a decreasing order.

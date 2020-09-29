@@ -260,7 +260,7 @@ they're collapsed together into the single incompatibility {foo ^1.0.0, not bar 
 Here we do the simple stupid thing of just growing the list.
 TODO: improve this. It may not be trivial since those incompatibilities
 may already have derived others.
-Maybe this should not be persued.
+Maybe this should not be pursued.
 
 -}
 merge : Incompatibility -> List Incompatibility -> List Incompatibility
